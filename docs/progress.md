@@ -37,3 +37,5 @@ Start the local dev server with `npm run dev -- --webpack` when using the Window
 A third fictional one-minute app run reproduced the report failure. On replay both attempts failed quote validation at top_fixes[0].evidence_quote. Report prompt v0.2 specifies how to copy evidence from candidate answers. Regenerating the same interview through the app returned ready and all seven evidence quotes matched. This run is available locally for review. M0 participant testing remains open.
 
 A fresh fictional one-minute Gemini app run after report prompt v0.2 produced a ready report on its first generation. All seven evidence quotes matched candidate answers. The run used the bundled fictional resume. M0 participant quality checkpoint remains open.
+
+A second fictional one-minute run after report prompt v0.2 failed during initial app report generation. Replaying its transcript with diagnose:gemini-report passed on the first request. Regenerating the report in the app returned ready. This indicates report generation remains inconsistent across calls. M0 participant quality checkpoint remains open.
