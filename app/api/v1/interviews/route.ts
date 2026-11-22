@@ -1,3 +1,4 @@
+import { consentRequired } from "@/lib/consent";
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/auth";
 import { rateLimited } from "@/lib/route-guard";
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
   if (!userId) return apiError("unauthenticated", "Sign in to continue.");
   const limited = await rateLimited(userId, "general");
   if (limited) return limited;
+  const consent = await consentRequired(userId);
+  if (consent) return consent;
   const body = await request.json().catch(() => null);
   if (!body) return apiError("validation_failed", "Send a JSON body.");
   try {

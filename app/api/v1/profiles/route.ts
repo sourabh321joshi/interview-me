@@ -1,3 +1,4 @@
+import { consentRequired } from "@/lib/consent";
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-error";
 import { getCurrentUserId } from "@/lib/auth";
@@ -13,6 +14,8 @@ export async function POST(request: Request) {
   if (!userId) return apiError("unauthenticated", "Sign in to continue.");
   const limited = await rateLimited(userId, "general", "profiles");
   if (limited) return limited;
+  const consent = await consentRequired(userId);
+  if (consent) return consent;
   const length = Number(request.headers.get("content-length") ?? 0);
   if (length > MAX_RESUME_BYTES + 100_000) return apiError("file_too_large", "Resume must be 5 MB or smaller.");
 

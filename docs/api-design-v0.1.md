@@ -84,7 +84,7 @@ Implemented as Next.js route handlers under `/api/v1`. Authentication, sign-in, 
 
 ### POST `/consent`
 
-Request: `{"version": "2026-11-v1"}`. Response `204`. Writes `consent_log` and updates `app_users`. Interview-related endpoints return `consent_required` until this is accepted.
+Request: `{"version": "2026-11-v1", "provider": "OpenAI"}`. The provider matches the one displayed on the consent screen. Response `204`. Records acceptance in `app_users.consents`. Routes that process profile or interview data return `consent_required` until the current terms are accepted.
 
 ### DELETE `/me`
 
