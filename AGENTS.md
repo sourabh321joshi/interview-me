@@ -12,11 +12,11 @@ Interview Me is an AI interview practice platform for developers with 0–3 year
 
 These are drafts. Follow them. Items marked as placeholders or open decisions are not decided: ask before inventing an answer. If the code needs to deviate from a document, stop and say so instead of changing it silently.
 
-## Current scope: M1 sign-in
+## Current scope: M1 web app foundations
 
-Text-only prototype: profile builder (resume PDF and GitHub), interview plan, text interview with streaming replies, report with quote validation. Single development user, no login.
+Text-only prototype: profile builder (resume PDF and GitHub), interview plan, text interview with streaming replies, report with quote validation. Users sign in with Better Auth.
 
-The owner tested with friends and waived the formal M0 participant checkpoint. Build sign-in as the first M1 feature. Choose the auth library with the owner and use its session cookie for user identity. Keep later M1 features and voice, payments, and the code editor out of this task.
+The owner tested with friends and waived the formal M0 participant checkpoint. M1 covers sign-in, consent, data controls, and basic interview history. Voice, payments, and the code editor remain outside M1.
 
 ## Stack
 

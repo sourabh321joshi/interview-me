@@ -1,3 +1,4 @@
+import { HistoryQuery, listInterviewHistory } from "@/lib/history";
 import { consentRequired } from "@/lib/consent";
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/auth";
@@ -24,5 +25,19 @@ export async function POST(request: Request) {
     );
   } catch (err) {
     return handleError(err);
+  }
+}
+
+export async function GET(request: Request) {
+  const userId = await getCurrentUserId(request.headers);
+  if (!userId) return apiError("unauthenticated", "Sign in to continue.");
+  const limited = await rateLimited(userId, "general");
+  if (limited) return limited;
+  const query = HistoryQuery.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if (!query.success) return apiError("validation_failed", "Invalid history limit or cursor.");
+  try {
+    return NextResponse.json(await listInterviewHistory(userId, query.data));
+  } catch (error) {
+    return handleError(error);
   }
 }
