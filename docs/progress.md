@@ -9,7 +9,7 @@ M0 tasks (see m0-build-tasks.md):
 - [x] Task 4: streaming turns, idempotent turn saving, timing, GET interview, test chat page at /interview
 - [x] Task 5: report (end interview, quote-validated report, regeneration limits, report page at /report)
 - [x] Task 6: hardening (rate limits, cross-route ownership tests, log and source guardrail tests, README, export tool)
-- [ ] M0 checkpoint: run real interviews with real keys, see docs/m0-checkpoint.md
+- M0 checkpoint: owner tested with friends and waived the formal five-developer minimum. Quality targets were not formally measured.
 
 ## Interview Me frontend
 
@@ -39,3 +39,7 @@ A third fictional one-minute app run reproduced the report failure. On replay bo
 A fresh fictional one-minute Gemini app run after report prompt v0.2 produced a ready report on its first generation. All seven evidence quotes matched candidate answers. The run used the bundled fictional resume. M0 participant quality checkpoint remains open.
 
 A second fictional one-minute run after report prompt v0.2 failed during initial app report generation. Replaying its transcript with diagnose:gemini-report passed on the first request. Regenerating the report in the app returned ready. This indicates report generation remains inconsistent across calls. M0 participant quality checkpoint remains open.
+
+## M1 web app foundations
+
+- [ ] Sign-in: select the auth library, implement sign-in and sign-out, and enforce session ownership on protected routes.
