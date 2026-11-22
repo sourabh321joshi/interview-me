@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 type Turn = { speaker: "interviewer" | "candidate"; text: string };
@@ -62,7 +63,7 @@ export default function InterviewPage() {
   const [offset, setOffset] = useState(0);
   const [now, setNow] = useState(0);
   const [draft, setDraft] = useState("");
-  const bottom = useRef<HTMLDivElement>(null);
+  const bottom = useRef<HTMLLIElement>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -157,14 +158,16 @@ export default function InterviewPage() {
     }
   }
 
-  const field = "mt-1 w-full rounded border border-gray-300 px-3 py-2";
+  const field = "field mt-2";
 
   if (stage === "setup") {
     return (
-      <main className="mx-auto max-w-xl p-6">
-        <h1 className="text-2xl font-semibold">Practice interview</h1>
-        <form onSubmit={startAll} className="mt-6 space-y-4">
-          <label className="block text-sm">Resume (PDF)
+      <main className="mx-auto max-w-3xl px-5 py-8 sm:py-12">
+        <Link href="/" className="text-sm font-semibold text-indigo-300">Interview Me</Link>
+        <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">Set up your interview</h1>
+        <p className="mt-2 text-muted">Add your resume so the interviewer can ask about your projects.</p>
+        <form onSubmit={startAll} className="surface mt-6 space-y-5 p-5 sm:p-7">
+          <label className="block text-sm">Resume PDF (up to 5 MB)
             <input name="resume" type="file" accept="application/pdf" required className={field} />
           </label>
           <label className="block text-sm">GitHub username (optional)
@@ -173,7 +176,7 @@ export default function InterviewPage() {
           <label className="block text-sm">Job description (optional)
             <textarea name="job_description" rows={3} className={field} />
           </label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="block text-sm">Role
               <select name="role" className={field}><option value="frontend">Frontend</option><option value="backend">Backend</option><option value="fullstack">Full-stack</option></select>
             </label>
@@ -184,42 +187,43 @@ export default function InterviewPage() {
               <select name="duration" className={field}><option value="300">5 minutes</option><option value="600">10 minutes</option></select>
             </label>
           </div>
-          <button disabled={!!busy} className="rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50">{busy || "Start interview"}</button>
-          {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+          <button disabled={!!busy} className="action">{busy || "Start interview"}</button>
+          {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
         </form>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto flex h-dvh max-w-2xl flex-col p-4">
-      <header className="flex items-center justify-between border-b pb-3">
-        <h1 className="font-semibold">Interview</h1>
+    <main className="mx-auto flex h-dvh max-w-4xl flex-col px-4 py-4 sm:px-8 sm:py-7">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
+        <div><p className="text-xs font-semibold text-indigo-300">Interview Me</p><h1 className="mt-1 text-xl font-semibold">Practice interview</h1></div>
         <div className="flex items-center gap-4">
-          <span className="text-sm tabular-nums" aria-live="off">{finished ? "Finished" : timeUp ? "Time is up" : remaining === null ? "" : `${clock(remaining)} left`}</span>
+          <span className="rounded-lg border border-line bg-panel px-3 py-2 text-sm font-semibold tabular-nums" aria-live="off">{finished ? "Finished" : timeUp ? "Time is up" : remaining === null ? "" : `${clock(remaining)} left`}</span>
           {finished ? <a className="text-sm underline" href={`/report?interview=${interviewId}`}>View feedback</a> : <button onClick={endNow} disabled={!!busy} className="text-sm underline disabled:opacity-50">End and get feedback</button>}
         </div>
       </header>
-      <ul className="flex-1 space-y-3 overflow-y-auto py-4">
+      <ul className="min-h-0 flex-1 space-y-5 overflow-y-auto py-5">
         {turns.map((t, i) => (
           <li key={i} className={t.speaker === "candidate" ? "text-right" : ""}>
-            <p className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-left ${t.speaker === "candidate" ? "bg-indigo-600 text-white" : "bg-gray-100"}`}>{t.text}</p>
+            <span className="mb-1 block text-xs font-medium text-muted">{t.speaker === "candidate" ? "You" : "Interviewer"}</span>
+            <p className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-left ${t.speaker === "candidate" ? "bg-indigo-600 text-white" : "border border-line bg-panel"}`}>{t.text}</p>
           </li>
         ))}
-        {live && <li><p className="inline-block max-w-[85%] whitespace-pre-wrap rounded-lg bg-gray-100 px-3 py-2">{live}</p></li>}
-        <div ref={bottom} />
+        {live && <li><p className="inline-block max-w-[85%] whitespace-pre-wrap rounded-lg border border-line bg-panel px-3 py-2">{live}</p></li>}
+        <li ref={bottom} aria-hidden="true" />
       </ul>
       {error && (
-        <div role="alert" className="mb-2 flex items-center justify-between rounded bg-red-50 px-3 py-2 text-sm text-red-800">
+        <div role="alert" className="mb-2 flex items-center justify-between rounded-lg border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-200">
           <span>{error}</span>
           {pending && <button onClick={() => runTurn(interviewId, { type: "answer", text: pending.text, client_turn_id: pending.id })} className="font-medium underline">Retry</button>}
         </div>
       )}
-      <form onSubmit={send} className="flex gap-2">
+      <form onSubmit={send} className="flex items-end gap-2 border-t border-line pt-4">
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} disabled={finished || timeUp || !!busy} aria-label="Your answer"
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
-          className="flex-1 rounded border border-gray-300 px-3 py-2 disabled:bg-gray-50" placeholder={finished ? "The interview is over." : "Type your answer. Enter to send."} />
-        <button disabled={finished || timeUp || !!busy || !draft.trim()} className="rounded bg-indigo-600 px-4 text-white disabled:opacity-50">Send</button>
+          className="field flex-1 resize-y" placeholder={finished ? "The interview is over." : "Type your answer. Enter to send."} />
+        <button disabled={finished || timeUp || !!busy || !draft.trim()} className="action">Send</button>
       </form>
     </main>
   );
