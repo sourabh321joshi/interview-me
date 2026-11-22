@@ -1,5 +1,5 @@
 import { apiError } from "@/lib/api-error";
-import { getCurrentUserId } from "@/lib/dev-user";
+import { getCurrentUserId } from "@/lib/auth";
 import { rateLimited } from "@/lib/route-guard";
 import { interviewDeps } from "@/lib/deps";
 import { getLlm } from "@/lib/llm";
@@ -7,14 +7,16 @@ import { handleError } from "@/lib/route-errors";
 import { prepareTurn, type Prepared } from "@/lib/turn-service";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const limited = await rateLimited(getCurrentUserId(), "general");
+  const userId = await getCurrentUserId(request.headers);
+  if (!userId) return apiError("unauthenticated", "Sign in to continue.");
+  const limited = await rateLimited(userId, "general");
   if (limited) return limited;
   const body = await request.json().catch(() => null);
   if (!body) return apiError("validation_failed", "Send a JSON body.");
   const deps = interviewDeps();
   let prepared: Prepared;
   try {
-    prepared = await prepareTurn(getCurrentUserId(), (await params).id, body, { interviews: deps.interviews, profiles: deps.profiles, llm: getLlm() });
+    prepared = await prepareTurn(userId, (await params).id, body, { interviews: deps.interviews, profiles: deps.profiles, llm: getLlm() });
   } catch (err) {
     return handleError(err);
   }

@@ -43,3 +43,5 @@ A second fictional one-minute run after report prompt v0.2 failed during initial
 ## M1 web app foundations
 
 - [ ] Sign-in: select the auth library, implement sign-in and sign-out, and enforce session ownership on protected routes.
+
+Self-hosted Better Auth email registration, sign-in, sign-out, and session ownership are implemented. Local API verification covered a fictional account, authenticated access, and 401 responses after sign-out. Google sign-in is wired and awaits OAuth credentials and a live check.

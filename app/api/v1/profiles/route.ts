@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-error";
-import { getCurrentUserId } from "@/lib/dev-user";
+import { getCurrentUserId } from "@/lib/auth";
 import { rateLimited } from "@/lib/route-guard";
 import { getLlm, LlmError } from "@/lib/llm";
 import { checkPdf, MAX_RESUME_BYTES } from "@/lib/pdf";
@@ -9,7 +9,9 @@ import { createMongoProfilesStore } from "@/lib/profiles-store";
 import { GithubUsernameSchema, JobDescriptionSchema } from "@/lib/schemas";
 
 export async function POST(request: Request) {
-  const limited = await rateLimited(getCurrentUserId(), "general", "profiles");
+  const userId = await getCurrentUserId(request.headers);
+  if (!userId) return apiError("unauthenticated", "Sign in to continue.");
+  const limited = await rateLimited(userId, "general", "profiles");
   if (limited) return limited;
   const length = Number(request.headers.get("content-length") ?? 0);
   if (length > MAX_RESUME_BYTES + 100_000) return apiError("file_too_large", "Resume must be 5 MB or smaller.");
@@ -29,7 +31,7 @@ export async function POST(request: Request) {
 
   try {
     const { profile, warnings } = await createProfile(
-      getCurrentUserId(),
+      userId,
       { pdf: bytes, githubUsername: gh || undefined, jobDescription: jd.data || undefined },
       { store: createMongoProfilesStore(), llm: getLlm(), githubToken: process.env.GITHUB_TOKEN },
     );

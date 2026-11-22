@@ -21,7 +21,7 @@ import { memoryStore } from "./helpers/memory-store";
 import { PLAN } from "./helpers/turn-setup";
 
 const state = vi.hoisted(() => ({ user: "u1", w: null as any }));
-vi.mock("@/lib/dev-user", () => ({ getCurrentUserId: () => state.user, DEV_USER_ID: "dev-user-1" }));
+vi.mock("@/lib/auth", () => ({ getCurrentUserId: () => state.user, DEV_USER_ID: "dev-user-1" }));
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => { state.w.pending.push(Promise.resolve().then(fn)); } }));
 vi.mock("@/lib/deps", () => ({
   interviewDeps: () => ({ interviews: state.w.interviews, users: state.w.users, profiles: state.w.profiles, llm: state.w.llm, models: () => ({ plan: "m", turn: "m", report: "m" }), freeLimit: 5 }),
