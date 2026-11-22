@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import type { Dimension, Report } from "@/lib/report-schema";
+import TranscriptView, { type TranscriptTurn } from "./transcript-view";
 
 type InterviewDetails = {
   role: "frontend" | "backend" | "fullstack";
   level: "fresher" | "junior";
   duration_seconds: number;
   started_at: string | null;
+  turns: TranscriptTurn[];
 };
 
 type State =
@@ -20,7 +22,17 @@ const LABELS: Record<Dimension, string> = { problem_solving: "Problem solving", 
 const ROLES: Record<InterviewDetails["role"], string> = { frontend: "Frontend", backend: "Backend", fullstack: "Full-stack" };
 const LEVELS: Record<InterviewDetails["level"], string> = { fresher: "Fresher", junior: "1–3 years" };
 
+function subscribeToReportView(callback: () => void) {
+  window.addEventListener("hashchange", callback);
+  return () => window.removeEventListener("hashchange", callback);
+}
+
 export default function ReportPage() {
+  const showTranscript = useSyncExternalStore(
+    subscribeToReportView,
+    () => window.location.hash === "#transcript",
+    () => false,
+  );
   const [state, setState] = useState<State>({ kind: "loading" });
   const [id, setId] = useState("");
 
@@ -55,13 +67,25 @@ export default function ReportPage() {
     return () => { stop = true; };
   }, []);
 
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (state.kind === "ready" && (hash === "#report" || hash === "#transcript")) {
+      document.getElementById(showTranscript ? "transcript" : "report")?.focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+    }
+  }, [showTranscript, state.kind]);
+
   async function regenerate() {
     await fetch(`/api/v1/interviews/${id}/report/regenerate`, { method: "POST" });
     window.location.reload();
   }
 
+  if (state.kind === "ready" && showTranscript) {
+    return <TranscriptView report={state.report} startedAt={state.details?.started_at ?? null} turns={state.details?.turns ?? null} />;
+  }
+
   return (
-    <main className="mx-auto max-w-5xl px-5 pb-12 sm:px-8">
+    <main id="report" tabIndex={-1} className="mx-auto max-w-5xl px-5 pb-12 sm:px-8">
       <header className="border-b border-line py-5">
         <Link href="/" className="font-semibold hover:text-indigo-300">Interview Me</Link>
       </header>
@@ -75,13 +99,13 @@ export default function ReportPage() {
           {state.canRegenerate ? <button onClick={regenerate} className="action">Try again</button> : <p className="text-sm text-muted">There may not have been enough answers to evaluate. <a className="underline" href="/interview">Start a new interview</a></p>}
         </div>
       )}
-      {state.kind === "ready" && <ReportView r={state.report} details={state.details} id={id} />}
+      {state.kind === "ready" && <ReportView r={state.report} details={state.details} />}
     </main>
   );
 }
 
 
-function ReportView({ r, details, id }: { r: Report; details: InterviewDetails | null; id: string }) {
+function ReportView({ r, details }: { r: Report; details: InterviewDetails | null }) {
   const interviewDate = details?.started_at
     ? new Date(details.started_at).toLocaleDateString(undefined, { dateStyle: "medium" })
     : null;
@@ -183,7 +207,7 @@ function ReportView({ r, details, id }: { r: Report; details: InterviewDetails |
         {r.limitations && <p className="mt-2 text-sm text-muted">{r.limitations}</p>}
         <div className="mt-5 flex flex-wrap items-center gap-4">
           <Link href="/interview" className="action">Practice again</Link>
-          <Link href={`/interview?interview=${id}`} className="text-sm font-semibold text-indigo-300 underline">View transcript</Link>
+          <a href="#transcript" className="text-sm font-semibold text-indigo-300 underline">View transcript</a>
         </div>
       </footer>
     </div>
