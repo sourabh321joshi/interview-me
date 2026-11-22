@@ -25,6 +25,7 @@ function setup(script: Array<string | Error>) {
       yield { type: "done", usage };
     },
   };
+  const onValidationFailure = vi.fn();
   let t = 0;
   const llm = createLlm({
     provider,
@@ -32,8 +33,9 @@ function setup(script: Array<string | Error>) {
     models: () => "test-model",
     prices: { "test-model": { input: 1, output: 2, cached_input: 0.5 } },
     now: () => (t += 50),
+    onValidationFailure,
   });
-  return { llm, calls, events };
+  return { llm, calls, events, onValidationFailure };
 }
 
 const schema = z.object({ ok: z.boolean() });
@@ -46,18 +48,22 @@ describe("generateJson", () => {
   });
 
   it("retries once with validation errors, then succeeds, logging both calls", async () => {
-    const { llm, calls, events } = setup(["not json", '{"ok":true}']);
+    const { llm, calls, events, onValidationFailure } = setup(["not json", '{"ok":true}']);
     expect(await llm.generateJson("report", schema, input)).toEqual({ ok: true });
     expect(calls).toHaveLength(2);
+    expect(onValidationFailure.mock.calls).toEqual([[{ role: "report", attempt: 1, reason: "json", issues: [] }]]);
     expect(calls[1].messages.at(-1)?.content).toContain("not valid JSON");
     expect(events).toHaveLength(2);
     expect(events[0]).toMatchObject({ role: "report", model: "test-model", user_id: "u1", latency_ms: 50 });
   });
 
   it("fails cleanly after the retry and still logs usage", async () => {
-    const { llm, events } = setup(['{"ok":1}', '{"ok":2}']);
+    const { llm, events, onValidationFailure } = setup(['{"ok":"private text"}', '{"ok":2}']);
     await expect(llm.generateJson("plan", schema, input)).rejects.toMatchObject({ code: "invalid_output" });
     expect(events).toHaveLength(2);
+    expect(onValidationFailure.mock.calls).toEqual([1, 2].map((attempt) => [{
+      role: "plan", attempt, reason: "schema", issues: [{ path: "ok", code: "invalid_type" }],
+    }]));
   });
 
   it("retries a transient provider error once, but not a permanent one", async () => {

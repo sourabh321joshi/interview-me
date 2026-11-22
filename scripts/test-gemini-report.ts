@@ -9,7 +9,12 @@ const answers = [
   "I chose server-side validation because clients can be bypassed. I added a regression test so empty task titles stay rejected.",
   "MongoDB keeps tasks after a restart. I would add an index for the owner and creation date so listing tasks stays fast as data grows.",
 ];
-const transcript = answers.map((answer) => `Candidate: ${answer}`).join("\n");
+const transcript = [
+  "Interviewer: Why did you validate task titles on the server, and how did you test it?",
+  `Candidate: ${answers[0]}`,
+  "Interviewer: Why did you use MongoDB, and how would you keep task listing fast as the app grows?",
+  `Candidate: ${answers[1]}`,
+].join("\n");
 const events: UsageEvent[] = [];
 const gemini = createGeminiProvider();
 let requestCount = 0;
@@ -28,25 +33,28 @@ const llm = createLlm({
   // Keep this fixture run isolated: no MongoDB writes and no transcript logging.
   sink: { async record(event) { events.push(event); } },
   models: () => model,
+  onValidationFailure: (failure) => console.log(JSON.stringify(failure)),
 });
 
 async function main() {
-  const report = await llm.generateJson("report", buildReportSchema(answers), {
+  await llm.generateJson("report", buildReportSchema(answers), {
     system: loadPrompt("report", {
       role_and_level: "frontend, fresher",
       transcript: wrapData("transcript", transcript),
     }),
-    messages: [{ role: "user", content: "Evaluate the fictional interview and return the report JSON now." }],
+    messages: [{ role: "user", content: "Evaluate the interview and return the report JSON now." }],
   });
 
   console.log(`Gemini report smoke test passed (${model}).`);
   console.log(`Quote/schema validation passed; ${requestCount} provider call(s).`);
-  if (events[0]) console.log(`Tokens: ${events[0].input_tokens} input, ${events[0].output_tokens} output.`);
-  console.log(JSON.stringify({ summary: report.summary, scores: report.scores, top_fixes: report.top_fixes }, null, 2));
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : "Unknown Gemini test error";
-  console.error(`Gemini report smoke test failed: ${message}`);
+  const reason = error instanceof LlmError ? error.code : "unknown";
+  console.error(`Gemini report smoke test failed (${reason}).`);
   process.exitCode = 1;
+}).finally(() => {
+  for (const [index, event] of events.entries()) {
+    console.log(`Attempt ${index + 1}: ${event.input_tokens} input tokens, ${event.output_tokens} output tokens.`);
+  }
 });

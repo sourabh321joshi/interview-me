@@ -30,4 +30,6 @@ A local synthetic one-minute smoke check on 2026-11-22 returned health `ok`; pro
 
 A second synthetic one-minute run with the updated Gemini key had the same `invalid_output` report failure. `GEMINI_DIAGNOSTIC_INTERVIEW_ID=<synthetic-id> npm run diagnose:gemini-report` replayed that run's exact transcript and passed quote/schema validation on its second Gemini call. The resulting feedback called the fixed answers off-topic; because the test script did not adapt its answers to the generated questions, that quality score is not meaningful. The second run's synthetic records and usage events were deleted. M0 remains open for prompt investigation and participant testing.
 
+Both Gemini report diagnostics now print the failed attempt, validation category, and schema field paths without printing the transcript or generated report. The isolated fictional transcript passed on its first request (596 input tokens and 929 output tokens). The app report failure has not been reproduced with this instrumentation.
+
 Start the local dev server with `npm run dev -- --webpack` when using the Windows setup. The design reference is the [Interview Me Stitch project](https://stitch.google.com/projects/12016856015326599769).

@@ -39,25 +39,26 @@ async function main() {
     provider,
     sink: { async record(event) { events.push(event); } },
     models: () => model,
+    onValidationFailure: (failure) => console.log(JSON.stringify(failure)),
   });
 
   try {
-    const report = await llm.generateJson("report", buildReportSchema(answers), {
+    await llm.generateJson("report", buildReportSchema(answers), {
       system: loadPrompt("report", {
         role_and_level: `${interview.role}, ${interview.level}`,
         transcript: wrapData("transcript", transcript),
       }),
       messages: [{ role: "user", content: "Evaluate the interview and return the report JSON now." }],
     });
-    console.log(JSON.stringify({ status: "ready", model, requests: requestCount, token_events: events.length, scores: report.scores, top_fix_titles: report.top_fixes.map((fix) => fix.title) }));
+    console.log(JSON.stringify({ status: "ready", model, requests: requestCount, token_events: events.length }));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.log(JSON.stringify({ status: "failed", model, requests: requestCount, token_events: events.length, error: message }));
+    const reason = error instanceof LlmError ? error.code : "unknown";
+    console.log(JSON.stringify({ status: "failed", model, requests: requestCount, token_events: events.length, error: reason }));
     process.exitCode = 1;
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : "Diagnostic failed");
+main().catch(() => {
+  console.error("Could not load the synthetic interview for diagnosis.");
   process.exitCode = 1;
 });

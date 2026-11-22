@@ -34,6 +34,7 @@ export type LlmDeps = {
   models?: (role: Role) => string;
   prices?: Record<string, Price>;
   now?: () => number;
+  onValidationFailure?: (failure: { role: Role; attempt: number; reason: "json" | "schema"; issues: { path: string; code: string }[] }) => void;
 };
 export type CallInput = { system: string; messages: Message[]; ctx?: CallContext };
 
@@ -85,6 +86,12 @@ export function createLlm(deps: LlmDeps) {
       const parsed = parseJson(text);
       const result = schema.safeParse(parsed);
       if (result.success) return result.data;
+      deps.onValidationFailure?.({
+        role,
+        attempt: attempt + 1,
+        reason: parsed === undefined ? "json" : "schema",
+        issues: parsed === undefined ? [] : result.error.issues.map(({ path, code }) => ({ path: path.join("."), code })),
+      });
       const issues = parsed === undefined
         ? "the output was not valid JSON"
         : result.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
