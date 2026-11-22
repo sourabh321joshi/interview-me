@@ -1,0 +1,129 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useRef } from "react";
+
+export type RoomTurn = { speaker: "interviewer" | "candidate"; text: string };
+
+type Props = {
+  interviewId: string;
+  turns: RoomTurn[];
+  live: string;
+  remaining: number | null;
+  finished: boolean;
+  replying: boolean;
+  awaitingReply: boolean;
+  ending: boolean;
+  error: string;
+  draft: string;
+  onDraft: (value: string) => void;
+  onSend: () => Promise<void>;
+  onRetry: () => void;
+  onEnd: () => Promise<void>;
+};
+
+function clock(seconds: number) {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+export default function InterviewRoom({
+  interviewId, turns, live, remaining, finished, replying, awaitingReply, ending,
+  error, draft, onDraft, onSend, onRetry, onEnd,
+}: Props) {
+  const transcript = useRef<HTMLOListElement>(null);
+  const expired = remaining === 0;
+  const busy = replying || ending;
+  const canAnswer = !finished && !expired && !busy && !awaitingReply;
+  const status = finished ? "Interview complete" : expired ? "Time is up" : ending ? "Ending interview…" : replying
+    ? live ? "Interviewer is responding…" : "Interviewer is thinking…"
+    : awaitingReply ? "Reply interrupted" : "Your turn";
+
+  useEffect(() => {
+    const list = transcript.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [turns, live]);
+
+  return (
+    <main className="mx-auto flex h-dvh max-w-5xl flex-col px-4 py-4 sm:px-8 sm:py-7">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
+        <div>
+          <Link href="/" className="text-sm font-semibold text-indigo-300 hover:text-white">Interview Me</Link>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">Practice interview</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {!finished && remaining !== null && (
+            <span className={`rounded-lg border border-line bg-panel px-3 py-2 text-sm font-semibold tabular-nums ${remaining <= 30 ? "text-amber-300" : ""}`}
+              aria-label="Time left" role="timer">
+              {clock(remaining)} left
+            </span>
+          )}
+          {finished ? (
+            <Link href={`/report?interview=${interviewId}`} className="action text-sm">View feedback</Link>
+          ) : (
+            <button type="button" onClick={() => void onEnd()} disabled={busy}
+              className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-muted hover:border-indigo-400 hover:text-white disabled:opacity-50">
+              {ending ? "Ending…" : "End and get feedback"}
+            </button>
+          )}
+        </div>
+      </header>
+
+      <section className="surface mt-4 flex min-h-0 flex-1 flex-col overflow-hidden" aria-labelledby="conversation-title">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-6">
+          <h2 id="conversation-title" className="text-sm font-semibold">Conversation</h2>
+          <p role="status" className="text-sm text-muted">{status}</p>
+        </div>
+        <ol ref={transcript} aria-label="Interview transcript" tabIndex={0}
+          className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 [overflow-anchor:none] focus-visible:outline-offset-[-3px] sm:px-6">
+          {turns.map((turn, index) => (
+            <li key={index} className={turn.speaker === "candidate" ? "flex justify-end" : ""}>
+              <div className="max-w-[90%] sm:max-w-[78%]">
+                <p className={`mb-1.5 text-xs font-semibold text-muted ${turn.speaker === "candidate" ? "text-right" : ""}`}>
+                  {turn.speaker === "candidate" ? "You" : "Interviewer"}
+                </p>
+                <p className={`whitespace-pre-wrap break-words rounded-xl border px-3.5 py-2.5 text-sm leading-relaxed sm:text-base ${turn.speaker === "candidate" ? "border-indigo-400/30 bg-indigo-500/15" : "border-line bg-background"}`}>
+                  {turn.text}
+                </p>
+              </div>
+            </li>
+          ))}
+          {live && (
+            <li className="max-w-[90%] sm:max-w-[78%]">
+              <p className="mb-1.5 text-xs font-semibold text-muted">Interviewer</p>
+              <p className="whitespace-pre-wrap break-words rounded-xl border border-line bg-background px-3.5 py-2.5 text-sm leading-relaxed sm:text-base">{live}</p>
+            </li>
+          )}
+          {!turns.length && !live && replying && <li className="text-sm text-muted">Waiting for your first question…</li>}
+        </ol>
+        {error && (
+          <div role="alert" className="mx-4 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-200 sm:mx-6">
+            <span>{error}</span>
+            {awaitingReply && !busy && !finished && !expired && (
+              <button type="button" onClick={onRetry} className="font-semibold underline">Retry reply</button>
+            )}
+          </div>
+        )}
+        {!finished && (
+          <form onSubmit={(event) => { event.preventDefault(); if (canAnswer) void onSend(); }}
+            className="space-y-2 border-t border-line px-4 py-3 sm:px-6">
+            <label htmlFor="interview-answer" className="block text-sm font-semibold">Your answer</label>
+            <div className="flex items-end gap-2">
+              <textarea id="interview-answer" value={draft} onChange={(event) => onDraft(event.target.value)}
+                rows={2} maxLength={2000} disabled={!canAnswer} aria-describedby="interview-answer-hint"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                className="field flex-1 resize-none"
+                placeholder={expired ? "The interview time has ended." : awaitingReply ? "Wait for the interviewer’s reply." : "Type your answer…"} />
+              <button disabled={!canAnswer || !draft.trim()} className="action shrink-0">Send</button>
+            </div>
+            <p id="interview-answer-hint" className="text-xs text-muted">Enter to send. Shift + Enter for a new line.</p>
+          </form>
+        )}
+      </section>
+    </main>
+  );
+}

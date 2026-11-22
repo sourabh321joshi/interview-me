@@ -11,4 +11,15 @@ M0 tasks (see m0-build-tasks.md):
 - [x] Task 6: hardening (rate limits, cross-route ownership tests, log and source guardrail tests, README, export tool)
 - [ ] M0 checkpoint: run real interviews with real keys, see docs/m0-checkpoint.md
 
-To continue in a new chat: upload the project (without node_modules), this file, and the docs, and ask for the next unchecked task.
+## Interview Me frontend
+
+- [x] Dark landing page and shared Tailwind styles.
+- [x] Add your context with resume upload, optional GitHub and job description, and profile build status.
+- [x] Review your profile with editable extracted fields and a save through the existing profile API.
+- [x] Interview setup with role, experience level, and 5- or 10-minute duration. A retry of a failed start can reuse the generated plan.
+- [x] Live text interview room with countdown, streaming replies, transcript, retry, and feedback handoff.
+- [ ] Rebuild the feedback report to match the dark Stitch design. The existing report works as a prototype.
+
+A live text interview with a synthetic resume has previously worked end to end. The latest frontend flows are verified using local mocks. Get the owner's permission before any test that spends OpenAI tokens.
+
+Start the local dev server with `npm run dev -- --webpack` when using the Windows setup. The design reference is the [Interview Me Stitch project](https://stitch.google.com/projects/12016856015326599769).
