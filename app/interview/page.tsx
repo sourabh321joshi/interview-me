@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import AddContext from "./add-context";
 import { useEffect, useRef, useState } from "react";
 
 type Turn = { speaker: "interviewer" | "candidate"; text: string };
@@ -51,7 +52,8 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
 
 export default function InterviewPage() {
   const router = useRouter();
-  const [stage, setStage] = useState<"setup" | "chat">("setup");
+  const [stage, setStage] = useState<"context" | "setup" | "chat">("context");
+  const [profileId, setProfileId] = useState("");
   const [interviewId, setInterviewId] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [live, setLive] = useState("");
@@ -113,17 +115,31 @@ export default function InterviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function startAll(e: React.FormEvent<HTMLFormElement>) {
+  async function buildProfile(form: FormData) {
+    if (busy) return;
+    setError("");
+    setBusy("Building your profile…");
+    try {
+      const profile = await api("/api/v1/profiles", { method: "POST", body: form });
+      setProfileId(profile.id);
+      setStage("setup");
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function startInterview(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+    if (!profileId || busy) return;
     const f = new FormData(e.currentTarget);
     try {
-      setBusy("Reading your resume and GitHub…");
-      const profile = await api("/api/v1/profiles", { method: "POST", body: f });
       setBusy("Planning your interview…");
       const iv = await api("/api/v1/interviews", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile_id: profile.id, role: f.get("role"), level: f.get("level"), duration_seconds: Number(f.get("duration")), mode: "text" }),
+        body: JSON.stringify({ profile_id: profileId, role: f.get("role"), level: f.get("level"), duration_seconds: Number(f.get("duration")), mode: "text" }),
       });
       const started = await api(`/api/v1/interviews/${iv.id}/start`, { method: "POST" });
       window.history.replaceState(null, "", `?interview=${iv.id}`);
@@ -160,37 +176,38 @@ export default function InterviewPage() {
 
   const field = "field mt-2";
 
-  if (stage === "setup") {
+  if (stage !== "chat") {
     return (
-      <main className="mx-auto max-w-3xl px-5 py-8 sm:py-12">
-        <Link href="/" className="text-sm font-semibold text-indigo-300">Interview Me</Link>
-        <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">Set up your interview</h1>
-        <p className="mt-2 text-muted">Add your resume so the interviewer can ask about your projects.</p>
-        <form onSubmit={startAll} className="surface mt-6 space-y-5 p-5 sm:p-7">
-          <label className="block text-sm">Resume PDF (up to 5 MB)
-            <input name="resume" type="file" accept="application/pdf" required className={field} />
-          </label>
-          <label className="block text-sm">GitHub username (optional)
-            <input name="github_username" className={field} />
-          </label>
-          <label className="block text-sm">Job description (optional)
-            <textarea name="job_description" rows={3} className={field} />
-          </label>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="block text-sm">Role
-              <select name="role" className={field}><option value="frontend">Frontend</option><option value="backend">Backend</option><option value="fullstack">Full-stack</option></select>
-            </label>
-            <label className="block text-sm">Level
-              <select name="level" className={field}><option value="fresher">Fresher</option><option value="junior">1–3 years</option></select>
-            </label>
-            <label className="block text-sm">Length
-              <select name="duration" className={field}><option value="300">5 minutes</option><option value="600">10 minutes</option></select>
-            </label>
-          </div>
-          <button disabled={!!busy} className="action">{busy || "Start interview"}</button>
-          {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-        </form>
-      </main>
+      <>
+        <div hidden={stage !== "context"}>
+          <AddContext onBuild={buildProfile} busy={busy} error={error} />
+        </div>
+        {stage === "setup" && (
+          <main className="mx-auto max-w-3xl px-5 py-8 sm:py-12">
+            <Link href="/" className="text-sm font-semibold text-indigo-300">Interview Me</Link>
+            <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">Set up your interview</h1>
+            <p className="mt-2 text-muted">Your profile is ready. Choose what you want to practice.</p>
+            <form onSubmit={startInterview} className="surface mt-6 space-y-5 p-5 sm:p-7">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block text-sm">Role
+                  <select name="role" className={field}><option value="frontend">Frontend</option><option value="backend">Backend</option><option value="fullstack">Full-stack</option></select>
+                </label>
+                <label className="block text-sm">Level
+                  <select name="level" className={field}><option value="fresher">Fresher</option><option value="junior">1–3 years</option></select>
+                </label>
+                <label className="block text-sm">Length
+                  <select name="duration" className={field}><option value="300">5 minutes</option><option value="600">10 minutes</option></select>
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <button disabled={!!busy} className="action">{busy || "Start interview"}</button>
+                <button type="button" disabled={!!busy} className="text-sm font-semibold text-indigo-300 underline disabled:opacity-50" onClick={() => { setError(""); setStage("context"); }}>Change context</button>
+              </div>
+              {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+            </form>
+          </main>
+        )}
+      </>
     );
   }
 
