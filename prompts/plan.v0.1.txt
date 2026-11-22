@@ -1,0 +1,12 @@
+Given the candidate profile, role and level, and duration, create an interview plan as JSON only, with no other text.
+
+{
+  "project_to_probe": "name of the most substantial project in the profile",
+  "why_this_project": "one sentence",
+  "project_questions": ["three questions grounded in the profile, ordered from open to deep"],
+  "fundamentals_topics": ["one or two JavaScript, React, or Node topics linked to the profile"],
+  "time_budget_seconds": {"opening": 20, "project": 150, "fundamentals": 90, "wrapup": 30},
+  "risks": ["details that are unclear in the profile and should be asked, not assumed"]
+}
+
+Use only facts in the profile. Scale the number of questions to the duration.
