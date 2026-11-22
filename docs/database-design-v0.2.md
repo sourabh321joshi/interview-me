@@ -126,13 +126,13 @@ Allowed values:
 - `slot_source`: `free`, `paid`
 - `turns[].speaker`: `interviewer`, `candidate`; `turns[].kind`: `speech`, `text`, `code`, `system`
 
-`turn_count` always equals the number of turns and is the next `seq`. `expire_at` is set only while an interview has not started (see TTL below).
+`turn_count` always equals the number of turns and is the next `seq`. `expire_at` is set on creation and updated on start and completion (see retention below).
 
 Indexes:
 
 - `{ user_id: 1, created_at: -1 }` for history
 - `{ status: 1, ends_at: 1 }` for stale-interview checks
-- TTL: `{ expire_at: 1 }` with `expireAfterSeconds: 0`, which removes unstarted interviews automatically
+- TTL: `{ expire_at: 1 }` with `expireAfterSeconds: 0`, which removes expired interviews automatically
 
 List queries must exclude the transcript with a projection (for example `{ turns: 0, plan: 0 }`) so history pages stay small.
 
@@ -302,7 +302,9 @@ if (r.count > limit) throw new RateLimited();
 Proposed defaults, to be confirmed:
 
 - Transcripts and reports are kept until the user deletes them.
-- Interviews that never start are removed by the TTL index about 30 days after creation. `expire_at` is set when the interview is created and removed when it starts.
+- Interviews that never start are removed about 30 days after creation.
+- When an interview starts, its transcript expires 30 days after the scheduled end if the interview is never closed. When it closes, the deadline is set to 30 days after completion.
+- A report inherits its interview's deadline in `reports.expire_at`. Both collections have TTL indexes. The app blocks access at the deadline and MongoDB removes the documents in the background.
 - `usage_events` expire after about 90 days. Cost totals stay on the interview.
 - Profiles can be deleted at any time. Interviews keep their stored plan, so history still works (`profile_id` becomes `null`).
 - Resume PDFs and audio are never stored.

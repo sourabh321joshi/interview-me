@@ -2,7 +2,7 @@ import { apiError } from "./api-error";
 import { COLLECTIONS, getDb } from "./db";
 import { createMongoUsersStore } from "./interviews-store";
 
-export const CONSENT_VERSION = "2026-11-v1";
+export const CONSENT_VERSION = "2026-11-v2";
 
 export function consentPolicy() {
   const provider = process.env.LLM_PROVIDER === "gemini" ? "Google Gemini" : "OpenAI";

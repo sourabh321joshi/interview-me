@@ -37,6 +37,7 @@ export default function ConsentScreen({ version, provider }: { version: string; 
         <p>Interview Me uses text from your resume, any job description you provide, and your answers to tailor questions and generate feedback.</p>
         <p>{provider} receives the text needed for these tasks. If you provide a GitHub username, the GitHub API supplies information about your public repositories.</p>
         <p>MongoDB Atlas stores your profile summary, interview transcript, and feedback report. Interview Me discards the original resume PDF after processing.</p>
+        <p>Your transcript and feedback report expire 30 days after the interview ends and are then deleted automatically.</p>
         {provider === "Google Gemini" && <p>Use a fictional resume and answers for this Gemini test setup.</p>}
       </div>
       <form onSubmit={submit} className="mt-6 space-y-4">

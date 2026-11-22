@@ -12,6 +12,7 @@ type InterviewDetails = {
   level: "fresher" | "junior";
   duration_seconds: number;
   started_at: string | null;
+  expire_at: string | null;
   turns: TranscriptTurn[];
 };
 
@@ -135,6 +136,12 @@ function ReportView({ r, details }: { r: Report; details: InterviewDetails | nul
             <div><dt className="text-xs text-muted">Duration</dt><dd className="mt-1 text-sm font-semibold">{details.duration_seconds / 60} {details.duration_seconds === 60 ? "minute" : "minutes"}</dd></div>
             {interviewDate && <div><dt className="text-xs text-muted">Date</dt><dd className="mt-1 text-sm font-semibold"><time dateTime={details.started_at!}>{interviewDate}</time></dd></div>}
           </dl>
+        )}
+        {details?.expire_at && (
+          <p className="mt-4 text-sm text-muted">
+            Report and transcript expire on{" "}
+            <time dateTime={details.expire_at}>{new Date(details.expire_at).toLocaleDateString(undefined, { dateStyle: "medium" })}</time>.
+          </p>
         )}
         <p className={`max-w-3xl leading-relaxed text-muted ${details ? "mt-4" : ""}`}>{r.summary}</p>
       </section>

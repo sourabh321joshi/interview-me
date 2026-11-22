@@ -1,5 +1,6 @@
 import { ObjectId, type Document, type UpdateFilter } from "mongodb";
 import { COLLECTIONS, getDb } from "./db";
+import { interviewExpiry } from "./retention";
 import type { Plan } from "./interview-schemas";
 
 export type InterviewStatus = "created" | "plan_ready" | "in_progress" | "wrapping_up" | "completed" | "abandoned" | "failed";
@@ -53,7 +54,7 @@ export function createMongoInterviewsStore(): InterviewsStore {
     },
     async findOwned(userId, id) {
       const _id = oid(id);
-      const d = _id ? await (await col()).findOne({ _id, user_id: userId }) : null;
+      const d = _id ? await (await col()).findOne({ _id, user_id: userId, $or: [{ expire_at: null }, { expire_at: { $gt: new Date() } }] }) : null;
       return d ? toDoc(d) : null;
     },
     async setPlan(userId, id, plan) {
@@ -71,7 +72,7 @@ export function createMongoInterviewsStore(): InterviewsStore {
       if (!_id) return null;
       const d = await (await col()).findOneAndUpdate(
         { _id, user_id: userId, status: "plan_ready" },
-        { $set: { status: "in_progress", ...data }, $unset: { expire_at: "" } },
+        { $set: { status: "in_progress", ...data, expire_at: interviewExpiry(data.ends_at) } },
         { returnDocument: "after" },
       );
       return d ? toDoc(d) : null;
@@ -91,7 +92,7 @@ export function createMongoInterviewsStore(): InterviewsStore {
     },
     async complete(userId, id, reason, endedAt) {
       const _id = oid(id);
-      if (_id) await (await col()).updateOne({ _id, user_id: userId, status: { $in: ["in_progress", "wrapping_up"] } }, { $set: { status: "completed", end_reason: reason, ended_at: endedAt } });
+      if (_id) await (await col()).updateOne({ _id, user_id: userId, status: { $in: ["in_progress", "wrapping_up"] } }, { $set: { status: "completed", end_reason: reason, ended_at: endedAt, expire_at: interviewExpiry(endedAt) } });
     },
   };
 }

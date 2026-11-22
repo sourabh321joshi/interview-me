@@ -78,13 +78,13 @@ Implemented as Next.js route handlers under `/api/v1`. Authentication, sign-in, 
   "display_name": "Riya",
   "free_interviews_remaining": 1,
   "paid_credits": 0,
-  "consent": {"required_version": "2026-11-v1", "accepted_version": null}
+  "consent": {"required_version": "2026-11-v2", "accepted_version": null}
 }
 ```
 
 ### POST `/consent`
 
-Request: `{"version": "2026-11-v1", "provider": "OpenAI"}`. The provider matches the one displayed on the consent screen. Response `204`. Records acceptance in `app_users.consents`. Routes that process profile or interview data return `consent_required` until the current terms are accepted.
+Request: `{"version": "2026-11-v2", "provider": "OpenAI"}`. The provider matches the one displayed on the consent screen. Response `204`. Records acceptance in `app_users.consents`. Routes that process profile or interview data return `consent_required` until the current terms are accepted.
 
 ### DELETE `/me`
 

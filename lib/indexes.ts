@@ -14,6 +14,7 @@ export const INDEXES: IndexDef[] = [
   { collection: "interviews", key: { user_id: 1, created_at: -1 } },
   { collection: "interviews", key: { status: 1, ends_at: 1 } },
   { collection: "interviews", key: { expire_at: 1 }, options: { expireAfterSeconds: 0 } },
+  { collection: "reports", key: { expire_at: 1 }, options: { expireAfterSeconds: 0 } },
   { collection: "reports", key: { interview_id: 1 }, options: { unique: true } },
   { collection: "reports", key: { user_id: 1, created_at: -1 } },
   { collection: "usage_events", key: { interview_id: 1 } },

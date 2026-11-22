@@ -46,4 +46,6 @@ A second fictional one-minute run after report prompt v0.2 failed during initial
 
 Self-hosted Better Auth email registration, sign-in, sign-out, and session ownership are implemented. Local API verification covered a fictional account, authenticated access, and 401 responses after sign-out. Google sign-in is wired and awaits OAuth credentials and a live check.
 
-M1 consent records the accepted version and active processors before profile building or interview processing. Changing the AI provider requires fresh consent. The owner approved a 30-day transcript and report retention target, with interview deletion and account deletion. Those controls remain to be implemented before promising automatic deletion in the consent screen.
+M1 consent records the accepted version and active processors before profile building or interview processing. Changing the AI provider requires fresh consent. The owner approved a 30-day transcript and report retention target, with interview deletion and account deletion. Manual interview and account deletion remain open.
+
+The 30-day retention rule is active in the development database. Eight interviews received deadlines and none were due immediately. An expired synthetic transcript and report were both removed by MongoDB, and the expired interview was inaccessible during cleanup. Reports show the expiry date and consent v2 explains the policy.

@@ -231,7 +231,7 @@ export async function getInterviewView(userId: string, id: string, deps: Pick<Tu
   }
   return {
     id: iv.id, status: iv.status, role: iv.role, level: iv.level, mode: iv.mode, duration_seconds: iv.duration_seconds,
-    started_at: iv.started_at, ends_at: iv.ends_at, server_now: now.toISOString(),
+    started_at: iv.started_at, ends_at: iv.ends_at, expire_at: iv.expire_at ?? null, server_now: now.toISOString(),
     remaining_seconds: iv.ends_at ? Math.max(0, Math.ceil((iv.ends_at.getTime() - now.getTime()) / 1000)) : null,
     turns: iv.turns.map((t) => ({ seq: t.seq, speaker: t.speaker, kind: t.kind, text: t.speaker === "interviewer" ? hideElapsed(t.text) : t.text, t_offset_ms: t.t_offset_ms, client_turn_id: t.speaker === "candidate" ? t.client_turn_id : null })),
   };

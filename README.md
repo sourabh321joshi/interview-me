@@ -72,3 +72,7 @@ Docs are in `docs/`. Rules for coding agents are in `AGENTS.md`. Progress is in 
 ## M1 sign-in
 
 Set BETTER_AUTH_URL to the app origin and BETTER_AUTH_SECRET to a random secret of at least 32 characters in .env.local. For local development use http://localhost:3000. Email/password registration is available at /sign-in. Google sign-in appears when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set. Register the callback http://localhost:3000/api/auth/callback/google in Google Cloud for local use. Signed-in accounts own their new interviews. Old shared development records stay with their original owner.
+
+## Interview retention
+
+Run `npm run db:indexes` to install the interview and report expiry indexes. For existing databases, first run `npm run db:interview-retention` to preview the backfill and see how many records are already due. Run `npm run db:interview-retention -- --apply` to assign the deadlines. Older records already past their deadline become eligible for automatic removal.
