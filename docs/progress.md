@@ -18,7 +18,7 @@ M0 tasks (see m0-build-tasks.md):
 - [x] Review your profile with editable extracted fields and a save through the existing profile API.
 - [x] Interview setup with role, experience level, and 5- or 10-minute duration. A retry of a failed start can reuse the generated plan.
 - [x] Live text interview room with countdown, streaming replies, transcript, retry, and feedback handoff.
-- [ ] Rebuild the feedback report to match the dark Stitch design. The existing report works as a prototype.
+- [x] Dark feedback report with interview details, four rubric scores, evidence, three fixes, a practice checklist, and transcript navigation.
 
 A live text interview with a synthetic resume has previously worked end to end. The latest frontend flows are verified using local mocks. Get the owner's permission before any test that spends OpenAI tokens.
 
