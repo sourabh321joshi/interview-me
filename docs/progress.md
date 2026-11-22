@@ -49,3 +49,5 @@ Self-hosted Better Auth email registration, sign-in, sign-out, and session owner
 M1 consent records the accepted version and active processors before profile building or interview processing. Changing the AI provider requires fresh consent. The owner approved a 30-day transcript and report retention target, with interview deletion and account deletion. Manual interview and account deletion remain open.
 
 The 30-day retention rule is active in the development database. Eight interviews received deadlines and none were due immediately. An expired synthetic transcript and report were both removed by MongoDB, and the expired interview was inaccessible during cleanup. Reports show the expiry date and consent v2 explains the policy.
+
+Users can delete an interview from its feedback page. Deletion removes the interview, including its transcript, and the report in one transaction. Account deletion remains open.

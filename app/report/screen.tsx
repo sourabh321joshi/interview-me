@@ -37,6 +37,9 @@ export default function ReportPage() {
   );
   const [state, setState] = useState<State>({ kind: "loading" });
   const [id, setId] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
 
   useEffect(() => {
     const interview = new URLSearchParams(window.location.search).get("interview") ?? "";
@@ -93,6 +96,23 @@ export default function ReportPage() {
     window.location.reload();
   }
 
+  async function removeInterview() {
+    if (deleting || !window.confirm("Permanently delete this interview, including its transcript and feedback?")) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const response = await fetch(`/api/v1/interviews/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error?.message ?? "Could not delete the interview.");
+      }
+      window.location.replace("/interview");
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Could not delete the interview.");
+      setDeleting(false);
+    }
+  }
+
   if (state.kind === "pending") return <ReportWrapUp ready={false} onViewReport={openReport} />;
 
   if (state.kind === "ready" && showTranscript) {
@@ -116,6 +136,14 @@ export default function ReportPage() {
         </div>
       )}
       {state.kind === "ready" && <ReportView r={state.report} details={state.details} />}
+      {id && (state.kind === "ready" || state.kind === "failed") && (
+        <div className="mt-10 border-t border-line pt-5">
+          <button type="button" className="text-sm font-medium text-red-300 underline" disabled={deleting} onClick={removeInterview}>
+            {deleting ? "Deleting…" : "Delete interview"}
+          </button>
+          {deleteError && <p role="alert" className="mt-2 text-sm text-red-300">{deleteError}</p>}
+        </div>
+      )}
     </main>
   );
 }

@@ -1,5 +1,5 @@
 import { ObjectId, type Document } from "mongodb";
-import { COLLECTIONS, getDb } from "./db";
+import { COLLECTIONS, getClientPromise, getDb } from "./db";
 import type { Dimension, Report } from "./report-schema";
 
 export type ReportStatus = "pending" | "ready" | "failed";
@@ -37,14 +37,24 @@ export function createMongoReportsStore(): ReportsStore {
       const interview_id = oid(interviewId);
       if (!interview_id) return false;
       const now = new Date();
-      const interview = await (await getDb()).collection(COLLECTIONS.interviews).findOne(
-        { _id: interview_id, user_id: userId, status: "completed" },
-        { projection: { expire_at: 1 } },
-      );
-      if (!(interview?.expire_at instanceof Date) || interview.expire_at <= now) return false;
+      const db = await getDb();
+      const client = await getClientPromise();
       try {
-        await (await col()).insertOne({ interview_id, user_id: userId, status: "pending", attempts: 1, error_code: null, rubric_version: null, summary: null, scores: null, details: null, model: null, created_at: now, updated_at: now, expire_at: interview.expire_at });
-        return true;
+        return await client.withSession(session => session.withTransaction(async () => {
+          // Write to the parent so report creation and interview deletion cannot commit past each other.
+          const interview = await db.collection(COLLECTIONS.interviews).findOneAndUpdate(
+            { _id: interview_id, user_id: userId, status: "completed", expire_at: { $gt: now } },
+            { $inc: { report_creation_revision: 1 } },
+            { session, projection: { expire_at: 1 } },
+          );
+          if (!interview) return false;
+          await db.collection(COLLECTIONS.reports).insertOne({
+            interview_id, user_id: userId, status: "pending", attempts: 1, error_code: null,
+            rubric_version: null, summary: null, scores: null, details: null, model: null,
+            created_at: now, updated_at: now, expire_at: interview.expire_at,
+          }, { session });
+          return true;
+        }));
       } catch (err) {
         if ((err as { code?: number }).code === 11000) return false; // unique index on interview_id: someone else claimed it
         throw err;

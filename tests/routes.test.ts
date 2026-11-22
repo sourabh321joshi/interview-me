@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ZodType } from "zod";
 import { setRateLimitStoreForTests } from "@/lib/rate-limit";
 import { LlmError } from "@/lib/llm";
-import { GET as getInterview } from "@/app/api/v1/interviews/[id]/route";
+import { DELETE as deleteInterviewRoute, GET as getInterview } from "@/app/api/v1/interviews/[id]/route";
 import { POST as postStart } from "@/app/api/v1/interviews/[id]/start/route";
 import { POST as postTurns } from "@/app/api/v1/interviews/[id]/turns/route";
 import { POST as postEnd } from "@/app/api/v1/interviews/[id]/end/route";
@@ -22,6 +22,7 @@ import { PLAN } from "./helpers/turn-setup";
 
 const state = vi.hoisted(() => ({ user: "u1", w: null as any }));
 vi.mock("@/lib/consent", () => ({ consentRequired: vi.fn(async () => null) }));
+vi.mock("@/lib/interview-deletion", () => ({ deleteInterview: async (userId: string, id: string) => userId === "u1" && id === "owned" }));
 vi.mock("@/lib/auth", () => ({ getCurrentUserId: () => state.user, DEV_USER_ID: "dev-user-1" }));
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => { state.w.pending.push(Promise.resolve().then(fn)); } }));
 vi.mock("@/lib/deps", () => ({
@@ -85,6 +86,17 @@ beforeEach(() => { state.w = makeWorld([["Hi."], ["Why?"], ["Thanks."]]); setRat
 afterEach(() => { vi.restoreAllMocks(); delete process.env.RATE_GENERAL_PER_MINUTE; delete process.env.RATE_PROFILES_PER_DAY; });
 
 describe("routes", () => {
+  it("uses the session owner when deleting an interview", async () => {
+    const request = req("/api/v1/interviews/owned", undefined, "DELETE");
+    state.user = "u2";
+    try {
+      expect((await deleteInterviewRoute(request, params("owned"))).status).toBe(404);
+    } finally {
+      state.user = "u1";
+    }
+    expect((await deleteInterviewRoute(request, params("owned"))).status).toBe(204);
+  });
+
   it("run a whole interview for the owner", async () => {
     const { id, statuses } = await runInterview();
     expect(statuses).toEqual([201, 200, 202]);
