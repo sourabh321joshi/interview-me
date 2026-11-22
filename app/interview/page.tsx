@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import AddContext from "./add-context";
+import InterviewSetup from "./interview-setup";
 import ReviewProfile from "./review-profile";
 import type { ProfileSummary } from "@/lib/schemas";
 import { useEffect, useRef, useState } from "react";
@@ -68,6 +68,7 @@ export default function InterviewPage() {
   const [now, setNow] = useState(0);
   const [draft, setDraft] = useState("");
   const bottom = useRef<HTMLLIElement>(null);
+  const plannedInterview = useRef<{ id: string; settings: string } | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -145,6 +146,7 @@ export default function InterviewPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(changes),
         });
+        plannedInterview.current = null;
         setProfile(saved);
       }
       setStage("setup");
@@ -155,18 +157,30 @@ export default function InterviewPage() {
     }
   }
 
-  async function startInterview(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
+  async function startInterview(form: FormData) {
     if (!profile || busy) return;
-    const f = new FormData(e.currentTarget);
+    setError("");
+    setBusy("Preparing your interview…");
+    const settings = JSON.stringify({
+      profile_id: profile.id,
+      role: form.get("role"),
+      level: form.get("level"),
+      duration_seconds: Number(form.get("duration")),
+      mode: "text",
+    });
+
     try {
-      setBusy("Planning your interview…");
-      const iv = await api("/api/v1/interviews", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile_id: profile.id, role: f.get("role"), level: f.get("level"), duration_seconds: Number(f.get("duration")), mode: "text" }),
-      });
+      let planned = plannedInterview.current;
+      if (planned?.settings !== settings) {
+        const interview = await api("/api/v1/interviews", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: settings,
+        });
+        planned = { id: interview.id, settings };
+        plannedInterview.current = planned;
+      }
+      const iv = planned;
       const started = await api(`/api/v1/interviews/${iv.id}/start`, { method: "POST" });
+      plannedInterview.current = null;
       window.history.replaceState(null, "", `?interview=${iv.id}`);
       setInterviewId(iv.id);
       setEndsAt(new Date(started.ends_at).getTime());
@@ -199,8 +213,6 @@ export default function InterviewPage() {
     }
   }
 
-  const field = "field mt-2";
-
   if (stage !== "chat") {
     return (
       <>
@@ -211,30 +223,11 @@ export default function InterviewPage() {
           <ReviewProfile summary={profile.summary} busy={!!busy} error={error} onContinue={saveProfile}
             onBack={() => { setError(""); setStage("context"); }} />
         )}
-        {stage === "setup" && (
-          <main className="mx-auto max-w-3xl px-5 py-8 sm:py-12">
-            <Link href="/" className="text-sm font-semibold text-indigo-300">Interview Me</Link>
-            <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">Set up your interview</h1>
-            <p className="mt-2 text-muted">Your profile is ready. Choose what you want to practice.</p>
-            <form onSubmit={startInterview} className="surface mt-6 space-y-5 p-5 sm:p-7">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="block text-sm">Role
-                  <select name="role" className={field}><option value="frontend">Frontend</option><option value="backend">Backend</option><option value="fullstack">Full-stack</option></select>
-                </label>
-                <label className="block text-sm">Level
-                  <select name="level" className={field}><option value="fresher">Fresher</option><option value="junior">1–3 years</option></select>
-                </label>
-                <label className="block text-sm">Length
-                  <select name="duration" className={field}><option value="300">5 minutes</option><option value="600">10 minutes</option></select>
-                </label>
-              </div>
-              <div className="flex flex-wrap items-center gap-4">
-                <button disabled={!!busy} className="action">{busy || "Start interview"}</button>
-                <button type="button" disabled={!!busy} className="text-sm font-semibold text-indigo-300 underline disabled:opacity-50" onClick={() => { setError(""); setStage("review"); }}>Review profile</button>
-              </div>
-              {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-            </form>
-          </main>
+        {profile && (
+          <div hidden={stage !== "setup"}>
+            <InterviewSetup key={profile.id} busy={busy} error={error} onStart={startInterview}
+              onReview={() => { setError(""); setStage("review"); }} />
+          </div>
         )}
       </>
     );
