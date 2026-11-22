@@ -24,4 +24,6 @@ M0 tasks (see m0-build-tasks.md):
 
 A live text interview with a synthetic resume has previously worked end to end. The latest frontend flows are verified using local mocks. Get the owner's permission before any test that spends OpenAI tokens.
 
+For Gemini experimentation, `npm run test:gemini-report` uses a fixed fictional transcript, validates the response with the report schema and quote checks, keeps usage only in memory, and does not write to MongoDB. The app's normal model provider remains OpenAI. Do not send real candidate data through the Gemini free tier.
+
 Start the local dev server with `npm run dev -- --webpack` when using the Windows setup. The design reference is the [Interview Me Stitch project](https://stitch.google.com/projects/12016856015326599769).
