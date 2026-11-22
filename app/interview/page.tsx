@@ -71,7 +71,9 @@ export default function InterviewPage() {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-  useEffect(() => bottom.current?.scrollIntoView({ block: "end" }), [turns, live]);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ block: "end" });
+  }, [turns, live]);
 
   const remaining = endsAt && now ? Math.max(0, Math.round((endsAt - (now + offset)) / 1000)) : null;
   const timeUp = remaining === 0;
