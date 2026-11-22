@@ -95,6 +95,12 @@ describe("config, pricing, usage totals", () => {
     expect(() => getModel("plan", {})).toThrow(/not configured/);
     expect(getModel("profile", { MODEL_TURN: "m" })).toBe("m");
   });
+  it("uses Gemini model config only when Gemini is explicitly selected", () => {
+    expect(getModel("turn", { LLM_PROVIDER: "gemini", GEMINI_MODEL: "gemini-test" })).toBe("gemini-test");
+    expect(getModel("report", { LLM_PROVIDER: "gemini", GEMINI_MODEL_REPORT: "gemini-report", GEMINI_MODEL: "gemini-default" })).toBe("gemini-report");
+    expect(() => getModel("turn", { LLM_PROVIDER: "gemini", MODEL_TURN: "gpt-test" })).toThrow(/not configured/);
+    expect(() => getModel("turn", { LLM_PROVIDER: "unknown", MODEL_TURN: "gpt-test" })).toThrow(/Unsupported LLM_PROVIDER/);
+  });
   it("estimates zero for unknown models", () => {
     expect(estimateCostUsd("unknown", usage, {})).toBe(0);
   });

@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { createGeminiProvider } from "./gemini-provider";
 import { createOpenAiProvider } from "./openai-provider";
 import { estimateCostUsd, getPrices, type Price } from "./pricing";
 import { createMongoUsageSink } from "./usage-sink";
@@ -9,9 +10,20 @@ import {
 export * from "./types";
 
 export function getModel(role: Role, env: Record<string, string | undefined> = process.env): string {
-  const model = { profile: env.MODEL_PROFILE ?? env.MODEL_TURN, plan: env.MODEL_PLAN, turn: env.MODEL_TURN, report: env.MODEL_REPORT }[role];
+  const provider = env.LLM_PROVIDER ?? "openai";
+  if (provider !== "openai" && provider !== "gemini") throw new LlmError("config", `Unsupported LLM_PROVIDER "${provider}"`);
+  const model = provider === "gemini"
+    ? env[`GEMINI_MODEL_${role.toUpperCase()}`] ?? env.GEMINI_MODEL
+    : { profile: env.MODEL_PROFILE ?? env.MODEL_TURN, plan: env.MODEL_PLAN, turn: env.MODEL_TURN, report: env.MODEL_REPORT }[role];
   if (!model) throw new LlmError("config", `Model for role "${role}" is not configured`);
   return model;
+}
+
+function createConfiguredProvider(env: Record<string, string | undefined> = process.env) {
+  const provider = env.LLM_PROVIDER ?? "openai";
+  if (provider === "openai") return createOpenAiProvider();
+  if (provider === "gemini") return createGeminiProvider(env.GEMINI_API_KEY);
+  throw new LlmError("config", `Unsupported LLM_PROVIDER "${provider}"`);
 }
 
 const DEFAULT_TIMEOUT_MS: Record<Role, number> = { profile: 60_000, plan: 60_000, turn: 45_000, report: 120_000 };
@@ -106,5 +118,5 @@ export function createLlm(deps: LlmDeps) {
 
 let shared: ReturnType<typeof createLlm> | undefined;
 export function getLlm() {
-  return (shared ??= createLlm({ provider: createOpenAiProvider(), sink: createMongoUsageSink() }));
+  return (shared ??= createLlm({ provider: createConfiguredProvider(), sink: createMongoUsageSink() }));
 }
