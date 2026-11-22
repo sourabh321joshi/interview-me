@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CreateInterviewSchema, timeBudget } from "@/lib/interview-schemas";
 import { createInterview, startInterview, type InterviewDeps } from "@/lib/interview-service";
 import { canTransition } from "@/lib/interview-state";
@@ -43,6 +43,21 @@ describe("createInterview", () => {
     expect(CreateInterviewSchema.safeParse(input("p", { duration_seconds: 90 })).success).toBe(false);
     expect(CreateInterviewSchema.safeParse(input("p", { role: "designer" })).success).toBe(false);
     expect(CreateInterviewSchema.parse(input("p")).mode).toBe("text");
+  });
+  it("allows a one-minute smoke test only in development and starts it with a 60-second timer", async () => {
+    const settings = (profileId: string) => input(profileId, { duration_seconds: 60 });
+    try {
+      vi.stubEnv("NODE_ENV", "production");
+      expect(CreateInterviewSchema.safeParse(settings("p")).success).toBe(false);
+      vi.stubEnv("NODE_ENV", "development");
+      const { deps, pid } = await setup();
+      const planned = await createInterview("u1", settings(pid), deps);
+      const started = await startInterview("u1", planned.id, deps);
+      expect(started.ends_at?.getTime()).toBe(NOW.getTime() + 60_000);
+      expect(planned.plan?.time_budget_seconds.wrapup).toBe(6);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
   it("rejects missing, foreign, and unready profiles", async () => {
     const { deps, pid, profiles } = await setup();

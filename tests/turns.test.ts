@@ -129,6 +129,27 @@ describe("turns", () => {
     expect(end(await collect(await prepareTurn("u1", id, body, deps))).is_final).toBe(true); // a retry still gets the final turn
   });
 
+  it("uses the short interview prompt and stops a smoke test at the one-minute deadline", async () => {
+    const { id, deps, clock, calls, interviews } = await startedInterview([["Tell me about TaskFlow."], ["What did you build?"], ["Thanks."]]);
+    const interview = interviews.docs.get(id)!;
+    const startedAt = interview.started_at!.getTime();
+    interview.duration_seconds = 60;
+    interview.ends_at = new Date(startedAt + 60_000);
+    await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps));
+    expect(calls[0].system).toContain("one-minute text mock interview");
+    clock.t = new Date(startedAt + 30_000);
+    await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "answer", text: "I built a task board." }, deps));
+    expect(calls[1].messages.at(-1)?.content).not.toContain("server note");
+    clock.t = new Date(startedAt + 54_000);
+    await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "answer", text: "I built the frontend." }, deps));
+    expect(calls[2].messages.at(-1)?.content).toContain("about 6 seconds remain");
+    clock.t = new Date(startedAt + 60_000);
+    await expect(prepareTurn("u1", id, { client_turn_id: uid(), type: "answer", text: "Time is up." }, deps))
+      .rejects.toMatchObject({ code: "interview_expired" });
+    expect(interviews.docs.get(id)?.status).toBe("completed");
+    expect(calls).toHaveLength(3);
+  });
+
   it("rejects turns after the time limit plus grace, and ends the interview", async () => {
     const { id, deps, interviews, clock, endsAt } = await startedInterview([["Hello."], ["Late."]]);
     await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps));

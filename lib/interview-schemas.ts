@@ -1,12 +1,15 @@
 import { z } from "zod";
 
 export const ALLOWED_DURATIONS = [300, 600] as const; // Quick and Standard (M0 is text only)
+export const SMOKE_TEST_DURATION = 60;
 
 export const CreateInterviewSchema = z.object({
   profile_id: z.string().min(1),
   role: z.enum(["frontend", "backend", "fullstack"]),
   level: z.enum(["fresher", "junior"]),
-  duration_seconds: z.union([z.literal(300), z.literal(600)]),
+  duration_seconds: z.union([z.literal(SMOKE_TEST_DURATION), z.literal(300), z.literal(600)])
+    .refine((duration) => duration !== SMOKE_TEST_DURATION || process.env.NODE_ENV === "development",
+      "The one-minute interview is for local development."),
   mode: z.enum(["voice", "text"]).default("text"),
 });
 export type CreateInterviewInput = z.infer<typeof CreateInterviewSchema>;

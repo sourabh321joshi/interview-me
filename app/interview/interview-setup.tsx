@@ -12,6 +12,7 @@ const levels: Option[] = [
   { value: "junior", label: "1–3 years", detail: "Some professional development experience" },
 ];
 const durations: Option[] = [
+  ...(process.env.NODE_ENV === "development" ? [{ value: "60", label: "1 minute", detail: "Local smoke test" }] : []),
   { value: "300", label: "5 minutes", detail: "Quick practice" },
   { value: "600", label: "10 minutes", detail: "More time for follow-up questions" },
 ];

@@ -132,7 +132,7 @@ function ReportView({ r, details }: { r: Report; details: InterviewDetails | nul
           <dl className="grid grid-cols-2 gap-4 border-b border-line pb-5 sm:grid-cols-4">
             <div><dt className="text-xs text-muted">Role</dt><dd className="mt-1 text-sm font-semibold">{ROLES[details.role]}</dd></div>
             <div><dt className="text-xs text-muted">Level</dt><dd className="mt-1 text-sm font-semibold">{LEVELS[details.level]}</dd></div>
-            <div><dt className="text-xs text-muted">Duration</dt><dd className="mt-1 text-sm font-semibold">{details.duration_seconds / 60} minutes</dd></div>
+            <div><dt className="text-xs text-muted">Duration</dt><dd className="mt-1 text-sm font-semibold">{details.duration_seconds / 60} {details.duration_seconds === 60 ? "minute" : "minutes"}</dd></div>
             {interviewDate && <div><dt className="text-xs text-muted">Date</dt><dd className="mt-1 text-sm font-semibold"><time dateTime={details.started_at!}>{interviewDate}</time></dd></div>}
           </dl>
         )}

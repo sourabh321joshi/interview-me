@@ -9,6 +9,10 @@ Purpose: decide whether the interviews and feedback are good enough to justify b
 3. Recruit 5–10 developers with 0–3 years of experience who agree to be tested. Use first names only, tell them what is stored (their resume summary, transcript, and report), and delete the data afterward.
 4. Do 2 practice runs yourself first, with your own resume, and fix anything obviously broken.
 
+## Local smoke test
+
+When running the development server, setup defaults to **1 minute** for checking the flow with less time and fewer follow-ups. Aim to submit two short answers so the report has enough evidence to run. Use the **5 minutes** option for the formal quality checkpoint below. The production build offers 5- and 10-minute interviews.
+
 ## Run each test
 
 1. Open `/interview`, upload the tester's resume, add their GitHub username if they have one, and choose role, level, and 5 minutes.

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export const PROMPT_VERSION = "0.1";
-export type PromptName = "interviewer" | "plan" | "report" | "profile-resume" | "github-summary";
+export type PromptName = "interviewer" | "interviewer-smoke-test" | "plan" | "report" | "profile-resume" | "github-summary";
 
 export function fillTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {

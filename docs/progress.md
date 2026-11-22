@@ -16,7 +16,7 @@ M0 tasks (see m0-build-tasks.md):
 - [x] Dark landing page and shared Tailwind styles.
 - [x] Add your context with resume upload, optional GitHub and job description, and profile build status.
 - [x] Review your profile with editable extracted fields and a save through the existing profile API.
-- [x] Interview setup with role, experience level, and 5- or 10-minute duration. A retry of a failed start can reuse the generated plan.
+- [x] Interview setup with role, experience level, and 5- or 10-minute duration, plus a 1-minute default in local development for smoke testing. A retry of a failed start can reuse the generated plan.
 - [x] Live text interview room with countdown, streaming replies, transcript, retry, and feedback handoff.
 - [x] Interview wrap-up with report-loading status and a View my report action when feedback is ready.
 - [x] Dark feedback report with interview details, four rubric scores, evidence, three fixes, a practice checklist, and transcript navigation.

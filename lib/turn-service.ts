@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SMOKE_TEST_DURATION, timeBudget } from "./interview-schemas";
 import { DomainError } from "./interview-service";
 import type { InterviewDoc, InterviewsStore, Turn } from "./interviews-store";
 import { LlmError, type CallContext, type Message } from "./llm";
@@ -9,6 +10,11 @@ export const MARKER = "[END_OF_INTERVIEW]";
 export const MAX_TURNS = 40;
 export const GRACE_MS = 15_000;
 export const WRAPUP_SECONDS = 30;
+
+function isPastDeadline(now: Date, endsAt: Date, duration: number) {
+  const deadline = endsAt.getTime();
+  return duration === SMOKE_TEST_DURATION ? now.getTime() >= deadline : now.getTime() > deadline + GRACE_MS;
+}
 
 export const TurnBodySchema = z.object({
   client_turn_id: z.uuid(),
@@ -68,7 +74,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
   if (reply) return replay(reply);
 
   if ((iv.status !== "in_progress" && iv.status !== "wrapping_up") || !iv.started_at || !iv.ends_at) throw new DomainError("interview_not_active", "This interview is not running.");
-  if (now.getTime() > iv.ends_at.getTime() + GRACE_MS || iv.turn_count >= MAX_TURNS) {
+  if (isPastDeadline(now, iv.ends_at, iv.duration_seconds) || iv.turn_count >= MAX_TURNS) {
     await deps.interviews.complete(userId, id, "timeout", now);
     throw new DomainError("interview_expired", "This interview has ended.");
   }
@@ -77,7 +83,9 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
 
   const startedAtMs = iv.started_at.getTime();
   const elapsedMs = now.getTime() - startedAtMs;
-  const wrap = remaining <= WRAPUP_SECONDS;
+  const smokeTest = iv.duration_seconds === SMOKE_TEST_DURATION;
+  const wrapSeconds = smokeTest ? timeBudget(iv.duration_seconds).wrapup : WRAPUP_SECONDS;
+  const wrap = remaining <= wrapSeconds;
   if (wrap) await deps.interviews.markWrappingUp(userId, id);
 
   let turns = iv.turns;
@@ -123,7 +131,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
     fundamentals_topics: iv.plan.fundamentals_topics,
     risks: project || repo ? iv.plan.risks.slice(0, 2) : [],
   };
-  const system = loadPrompt("interviewer", {
+  const system = loadPrompt(smokeTest ? "interviewer-smoke-test" : "interviewer", {
     role_and_level: `${iv.role}, ${iv.level}`,
     duration_minutes: String(iv.duration_seconds / 60),
     candidate_profile: wrapData("candidate_profile", briefing ? JSON.stringify(briefing) : "Not available."),
@@ -137,7 +145,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
       ? { role: "assistant", content: t.text }
       : { role: "user", content: `${tag(t.t_offset_ms)} ${t.kind === "system" ? "(The candidate has been silent for a while.)" : t.text}` });
   }
-  if (wrap) messages[messages.length - 1].content += "\n[server note: about 30 seconds remain. Give your closing message now, then add the end marker line.]";
+  if (wrap) messages[messages.length - 1].content += `\n[server note: about ${wrapSeconds} seconds remain. Give your closing message now, then add the end marker line.]`;
 
   const b = iv.plan?.time_budget_seconds;
   const e = elapsedMs / 1000;
@@ -169,7 +177,7 @@ export async function getInterviewView(userId: string, id: string, deps: Pick<Tu
   if (!iv) throw new DomainError("not_found", "Interview not found.");
   const now = deps.now?.() ?? new Date();
   const running = iv.status === "in_progress" || iv.status === "wrapping_up";
-  if (running && iv.ends_at && now.getTime() > iv.ends_at.getTime() + GRACE_MS) { // heal interviews nobody finished
+  if (running && iv.ends_at && isPastDeadline(now, iv.ends_at, iv.duration_seconds)) { // heal interviews nobody finished
     await deps.interviews.complete(userId, id, "timeout", now);
     iv = (await deps.interviews.findOwned(userId, id)) as InterviewDoc;
   }
