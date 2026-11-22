@@ -145,7 +145,7 @@ RUBRIC (score 1–5, or null if there is not enough evidence)
 Calibrate to {{role_and_level}}. Score anchors: 1 cannot explain, 2 partial or memorized, 3 mostly correct for level, 4 strong with trade-offs, 5 excellent for level.
 
 RULES
-- Every quote must be an exact substring of the transcript.
+- For each evidence quote, including all three top_fixes evidence_quote values, copy at least eight consecutive characters from a single candidate answer, exactly as written. Preserve capitalization and punctuation. Exclude speaker labels and interviewer questions. You may reuse a candidate quote for multiple fixes. For a missing detail, quote the relevant part of the answer and describe the omission outside the quote.
 - Do not invent anything the candidate did not say.
 - If evidence is insufficient for a dimension, set its score to null and explain why.
 - Do not give a hire or reject decision.

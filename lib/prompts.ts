@@ -19,7 +19,7 @@ export function wrapData(label: string, text: string): string {
   return `<data label="${label}">\n${safe}\n</data>`;
 }
 
-export function loadPrompt(name: PromptName, vars: Record<string, string> = {}, version = PROMPT_VERSION): string {
+export function loadPrompt(name: PromptName, vars: Record<string, string> = {}, version = name === "report" ? "0.2" : PROMPT_VERSION): string {
   const file = path.join(process.cwd(), "prompts", `${name}.v${version}.txt`);
   return fillTemplate(fs.readFileSync(file, "utf-8"), vars);
 }

@@ -13,7 +13,7 @@ describe("prompts", () => {
     const report = loadPrompt("report", { role_and_level: "frontend, fresher", transcript: "T" });
     for (const p of [interviewer, plan, report]) expect(p).not.toMatch(/\{\{\w+\}\}/);
     expect(interviewer).toContain("[END_OF_INTERVIEW]");
-    expect(report).toContain("exact substring");
+    expect(report).toContain("eight consecutive characters from a single candidate answer");
   });
 
   it("neutralizes data tags inside untrusted text", () => {
