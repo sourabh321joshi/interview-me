@@ -25,7 +25,10 @@ export function createOpenAiProvider(client?: OpenAI): LlmProvider {
   const params = (req: LlmRequest) => ({
     model: req.model,
     instructions: req.system,
-    input: req.messages.map((m) => ({ role: m.role, content: m.content })),
+    // JSON mode checks the input messages for "JSON", even when instructions already mention it.
+    input: req.json
+      ? [...req.messages, { role: "user" as const, content: "Return the result as JSON." }]
+      : req.messages,
     store: false, // do not keep our requests on the provider side
     ...(req.json ? { text: { format: { type: "json_object" as const } } } : {}),
   });

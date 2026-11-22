@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import OpenAI from "openai";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { createLlm, getModel, LlmError, type LlmProvider, type LlmRequest, type UsageEvent } from "@/lib/llm";
+import { createOpenAiProvider } from "@/lib/llm/openai-provider";
 import { estimateCostUsd } from "@/lib/llm/pricing";
 import { buildUsageInc } from "@/lib/llm/usage-sink";
 
@@ -100,4 +102,20 @@ describe("config, pricing, usage totals", () => {
     const inc = buildUsageInc({ provider: "p", role: "turn", model: "m", ...usage, latency_ms: 1, est_cost_usd: 0.5 });
     expect(inc).toEqual({ "usage_totals.llm_input_tokens": 100, "usage_totals.llm_output_tokens": 20, "usage_totals.est_cost_usd": 0.5 });
   });
+});
+
+it("includes a JSON instruction in the Responses API input for JSON mode", async () => {
+  const client = new OpenAI({ apiKey: "test-key" });
+  const create = vi.spyOn(client.responses, "create").mockRejectedValue(new Error("stop before network"));
+  const provider = createOpenAiProvider(client);
+  const messages = [{ role: "user" as const, content: "<data>Example resume</data>" }];
+
+  await expect(provider.generate({
+    model: "test-model", system: "Extract the profile.", messages, json: true, timeoutMs: 1000,
+  })).rejects.toThrow("OpenAI request failed");
+
+  expect(create).toHaveBeenCalledWith(expect.objectContaining({
+    input: [...messages, { role: "user", content: expect.stringMatching(/json/i) }],
+    text: { format: { type: "json_object" } },
+  }), { timeout: 1000 });
 });
