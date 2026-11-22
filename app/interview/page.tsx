@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AddContext from "./add-context";
+import ReviewProfile from "./review-profile";
+import type { ProfileSummary } from "@/lib/schemas";
 import { useEffect, useRef, useState } from "react";
 
 type Turn = { speaker: "interviewer" | "candidate"; text: string };
@@ -52,8 +54,8 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
 
 export default function InterviewPage() {
   const router = useRouter();
-  const [stage, setStage] = useState<"context" | "setup" | "chat">("context");
-  const [profileId, setProfileId] = useState("");
+  const [stage, setStage] = useState<"context" | "review" | "setup" | "chat">("context");
+  const [profile, setProfile] = useState<{ id: string; summary: ProfileSummary } | null>(null);
   const [interviewId, setInterviewId] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [live, setLive] = useState("");
@@ -123,7 +125,28 @@ export default function InterviewPage() {
     setBusy("Building your profile…");
     try {
       const profile = await api("/api/v1/profiles", { method: "POST", body: form });
-      setProfileId(profile.id);
+      setProfile(profile);
+      setStage("review");
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function saveProfile(changes: Partial<Omit<ProfileSummary, "schema_version">>) {
+    if (!profile || busy) return;
+    setError("");
+    setBusy("Saving your profile…");
+    try {
+      if (Object.keys(changes).length) {
+        const saved = await api(`/api/v1/profiles/${profile.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(changes),
+        });
+        setProfile(saved);
+      }
       setStage("setup");
     } catch (err) {
       setError(errorText(err));
@@ -135,13 +158,13 @@ export default function InterviewPage() {
   async function startInterview(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
-    if (!profileId || busy) return;
+    if (!profile || busy) return;
     const f = new FormData(e.currentTarget);
     try {
       setBusy("Planning your interview…");
       const iv = await api("/api/v1/interviews", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile_id: profileId, role: f.get("role"), level: f.get("level"), duration_seconds: Number(f.get("duration")), mode: "text" }),
+        body: JSON.stringify({ profile_id: profile.id, role: f.get("role"), level: f.get("level"), duration_seconds: Number(f.get("duration")), mode: "text" }),
       });
       const started = await api(`/api/v1/interviews/${iv.id}/start`, { method: "POST" });
       window.history.replaceState(null, "", `?interview=${iv.id}`);
@@ -184,6 +207,10 @@ export default function InterviewPage() {
         <div hidden={stage !== "context"}>
           <AddContext onBuild={buildProfile} busy={busy} error={error} />
         </div>
+        {stage === "review" && profile && (
+          <ReviewProfile summary={profile.summary} busy={!!busy} error={error} onContinue={saveProfile}
+            onBack={() => { setError(""); setStage("context"); }} />
+        )}
         {stage === "setup" && (
           <main className="mx-auto max-w-3xl px-5 py-8 sm:py-12">
             <Link href="/" className="text-sm font-semibold text-indigo-300">Interview Me</Link>
@@ -203,7 +230,7 @@ export default function InterviewPage() {
               </div>
               <div className="flex flex-wrap items-center gap-4">
                 <button disabled={!!busy} className="action">{busy || "Start interview"}</button>
-                <button type="button" disabled={!!busy} className="text-sm font-semibold text-indigo-300 underline disabled:opacity-50" onClick={() => { setError(""); setStage("context"); }}>Change context</button>
+                <button type="button" disabled={!!busy} className="text-sm font-semibold text-indigo-300 underline disabled:opacity-50" onClick={() => { setError(""); setStage("review"); }}>Review profile</button>
               </div>
               {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
             </form>
