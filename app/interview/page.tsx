@@ -5,6 +5,7 @@ import AddContext from "./add-context";
 import InterviewSetup from "./interview-setup";
 import InterviewRoom, { type RoomTurn } from "./interview-room";
 import ReviewProfile from "./review-profile";
+import type { Warning } from "@/lib/profile-builder";
 import type { ProfileSummary } from "@/lib/schemas";
 import { useEffect, useRef, useState } from "react";
 
@@ -54,7 +55,7 @@ async function streamTurn(interviewId: string, body: object, onDelta: (t: string
 export default function InterviewPage() {
   const router = useRouter();
   const [stage, setStage] = useState<"context" | "review" | "setup" | "chat">("context");
-  const [profile, setProfile] = useState<{ id: string; summary: ProfileSummary } | null>(null);
+  const [profile, setProfile] = useState<{ id: string; summary: ProfileSummary; warnings?: Warning[] } | null>(null);
   const [interviewId, setInterviewId] = useState("");
   const [turns, setTurns] = useState<RoomTurn[]>([]);
   const [live, setLive] = useState("");
@@ -149,7 +150,7 @@ export default function InterviewPage() {
           body: JSON.stringify(changes),
         });
         plannedInterview.current = null;
-        setProfile(saved);
+        setProfile({ ...profile, summary: saved.summary });
       }
       setStage("setup");
     } catch (err) {
@@ -225,7 +226,7 @@ export default function InterviewPage() {
           <AddContext onBuild={buildProfile} busy={busy} error={error} />
         </div>
         {stage === "review" && profile && (
-          <ReviewProfile summary={profile.summary} busy={!!busy} error={error} onContinue={saveProfile}
+          <ReviewProfile summary={profile.summary} warnings={profile.warnings} busy={!!busy} error={error} onContinue={saveProfile}
             onBack={() => { setError(""); setStage("context"); }} />
         )}
         {profile && (

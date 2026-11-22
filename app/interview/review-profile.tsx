@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import type { Warning } from "@/lib/profile-builder";
 import { ProfilePatchSchema, type ProfileSummary } from "@/lib/schemas";
 
 type ProfileFields = Omit<ProfileSummary, "schema_version">;
@@ -11,10 +12,18 @@ type Draft = Omit<ProfileFields, "skills" | "projects"> & {
 };
 type Props = {
   summary: ProfileSummary;
+  warnings?: Warning[];
   busy: boolean;
   error: string;
   onContinue: (changes: Partial<ProfileFields>) => Promise<void>;
   onBack: () => void;
+};
+
+const WARNING_MESSAGES: Record<Warning, string> = {
+  github_not_found: "We couldn’t find that GitHub profile. We used your resume to build this profile.",
+  github_rate_limited: "GitHub temporarily limited requests. We used your resume to build this profile.",
+  github_unavailable: "We couldn’t reach GitHub. We used your resume to build this profile.",
+  resume_text_short: "We could only extract a small amount of text from your resume. Check that your skills and projects are complete.",
 };
 
 const list = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
@@ -67,7 +76,7 @@ function Entries<T>({ title, singular, items, max, blank, onChange, children }: 
   );
 }
 
-export default function ReviewProfile({ summary, busy, error, onContinue, onBack }: Props) {
+export default function ReviewProfile({ summary, warnings = [], busy, error, onContinue, onBack }: Props) {
   const [draft, setDraft] = useState<Draft>(() => ({
     ...summary,
     skills: summary.skills.join(", "),
@@ -112,6 +121,14 @@ export default function ReviewProfile({ summary, busy, error, onContinue, onBack
       <form onSubmit={submit} className="mx-auto mt-9 max-w-2xl sm:mt-12">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Review your profile</h1>
         <p className="mt-3 text-muted">Check what we took from your resume. Edit anything you’d like the interviewer to get right.</p>
+        {warnings.length > 0 && (
+          <section aria-labelledby="profile-notes" className="mt-5 rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-3">
+            <h2 id="profile-notes" className="text-sm font-semibold text-amber-200">Profile notes</h2>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-muted">
+              {warnings.map((warning) => <li key={warning}>{WARNING_MESSAGES[warning]}</li>)}
+            </ul>
+          </section>
+        )}
         <fieldset disabled={busy} className="mt-7 min-w-0 space-y-5">
           <section className="surface space-y-4 p-5 sm:p-6">
             <h2 className="text-lg font-semibold">About you</h2>
