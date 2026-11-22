@@ -94,12 +94,41 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
   const seq = turns.length;
 
   const profile = iv.profile_id ? await deps.profiles.findOwned(userId, iv.profile_id) : null;
+  // The planner has already seen the full profile and job description.
+  const summary = profile?.summary;
+  const repos = profile?.github_summary?.repos ?? [];
+  const normalizeName = (name: string) => name.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  const plannedProject = normalizeName(iv.plan?.project_to_probe ?? "");
+  const project = summary?.projects.find((item) => plannedProject && normalizeName(item.name) === plannedProject);
+  const repo = repos.find((item) => plannedProject && normalizeName(item.name) === plannedProject);
+  const selectedProject = project ?? (repo ? undefined : summary?.projects[0]);
+  const selectedRepo = repo ?? (selectedProject
+    ? repos.find((item) => normalizeName(item.name) === normalizeName(selectedProject.name))
+    : repos[0]);
+
+  const briefing = summary ? {
+    first_name: summary.first_name,
+    years_experience: summary.years_experience,
+    skills: summary.skills.slice(0, 8),
+    project: selectedProject,
+    github_repo: selectedRepo && {
+      name: selectedRepo.name,
+      languages: selectedRepo.languages,
+      readme_gist: selectedRepo.readme_gist.slice(0, 200),
+      notable: selectedRepo.notable.slice(0, 1),
+    },
+  } : null;
+  const plan = iv.plan && {
+    project_questions: project || repo ? iv.plan.project_questions : [],
+    fundamentals_topics: iv.plan.fundamentals_topics,
+    risks: project || repo ? iv.plan.risks.slice(0, 2) : [],
+  };
   const system = loadPrompt("interviewer", {
     role_and_level: `${iv.role}, ${iv.level}`,
     duration_minutes: String(iv.duration_seconds / 60),
-    candidate_profile: wrapData("candidate_profile", profile?.summary ? JSON.stringify({ summary: profile.summary, github_repos: profile.github_summary?.repos ?? [] }) : "Not available."),
-    job_description: wrapData("job_description", profile?.job_description ?? "none"),
-  }) + "\n\nINTERVIEW PLAN (data from the planner)\n" + wrapData("interview_plan", JSON.stringify(iv.plan));
+    candidate_profile: wrapData("candidate_profile", briefing ? JSON.stringify(briefing) : "Not available."),
+    job_description: wrapData("job_description", profile?.job_description?.slice(0, 500) || "none"),
+  }) + "\n\nINTERVIEW PLAN (data from the planner)\n" + wrapData("interview_plan", JSON.stringify(plan));
 
   const tag = (ms: number) => `[elapsed: ${fmt(ms)} of ${fmt(iv.duration_seconds * 1000)}]`;
   const messages: Message[] = [{ role: "user", content: `${tag(0)} (The interview is starting. Greet the candidate and ask your first question.)` }];

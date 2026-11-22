@@ -127,7 +127,7 @@ Report status (`pending`, `ready`, `failed`) is tracked separately on the report
 ## 8. LLM layer
 
 - Interface with three roles: `plan`, `turn`, `report`. Model names and settings live in config.
-- Prompt for turns: versioned system prompt, then profile and plan (fixed prefix, cache where supported), then the conversation so far.
+- Prompt for turns: versioned system prompt, then a fixed briefing with the selected project, relevant repository context, and key plan topics, followed by the conversation so far. Planning still uses the full profile and report generation uses the complete transcript.
 - Structured outputs (plan, report, profile summary) are validated with a schema. One retry with the validation errors, then fail cleanly.
 - Timeouts and retries per call. Log input tokens, output tokens, cached tokens, latency, and estimated cost to `usage_events`.
 - Prompts treat resume, GitHub, and job description text as data. See Security.

@@ -32,6 +32,35 @@ describe("turns", () => {
     expect(calls[0].system).toContain('<data label="candidate_profile">');
   });
 
+  it("sends the planned project and relevant repository without unrelated profile details", async () => {
+    const { id, deps, interviews, calls } = await startedInterview([["Tell me about TaskFlow."]]);
+    const profileId = interviews.docs.get(id)!.profile_id!;
+    const profile = (await deps.profiles.findOwned("u1", profileId))!;
+    const summary = profile.summary!;
+    await deps.profiles.markReady("u1", profileId, {
+      summary: {
+        ...summary,
+        projects: [{ name: "UnrelatedSideProject", description: "Other project", tech: [], role: "" }, ...summary.projects],
+      },
+      github_summary: {
+        schema_version: 1,
+        fetched_at: new Date().toISOString(),
+        repos: [
+          { name: "unrelated-repo", readme_gist: "Other repository", languages: [], notable: [], last_pushed: "" },
+          { name: "task-flow", readme_gist: "Kanban repository", languages: ["JavaScript"], notable: [], last_pushed: "" },
+        ],
+      },
+    });
+
+    await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps));
+    const { system } = calls[0];
+    expect(system).toContain("TaskFlow");
+    expect(system).toContain("Built the frontend");
+    expect(system).toContain("Kanban repository");
+    expect(system).toContain("Closures");
+    expect(system).not.toMatch(/UnrelatedSideProject|unrelated-repo|B.Tech CSE|Most substantial|time_budget_seconds/);
+  });
+
   it("saves the answer first, adds the elapsed line, and stores the reply", async () => {
     const { id, deps, interviews, clock, calls } = await startedInterview([["Hello."], ["Why Socket.IO?"]]);
     await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps));
