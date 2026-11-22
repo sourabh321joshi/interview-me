@@ -26,4 +26,6 @@ A live text interview with a synthetic resume has previously worked end to end. 
 
 For Gemini experimentation, `npm run test:gemini-report` uses a fixed fictional transcript, validates the response with the report schema and quote checks, keeps usage only in memory, and does not write to MongoDB. App routes can select Gemini with `LLM_PROVIDER=gemini`; this has no automatic OpenAI fallback. Use only synthetic data with Gemini's free tier, which may use prompts and responses to improve Google's products.
 
+A local synthetic one-minute smoke check on 2026-11-22 returned health `ok`; profile creation, interview planning, and turns succeeded through Gemini. Report generation failed with `invalid_output` after schema validation retry. The synthetic profile, interview, report, and usage events were deleted afterward. The formal M0 checkpoint remains open.
+
 Start the local dev server with `npm run dev -- --webpack` when using the Windows setup. The design reference is the [Interview Me Stitch project](https://stitch.google.com/projects/12016856015326599769).
