@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export const PROMPT_VERSION = "0.1";
+export const INTERVIEWER_PROMPT_VERSION = "0.2";
 export type PromptName = "interviewer" | "interviewer-smoke-test" | "plan" | "report" | "profile-resume" | "github-summary";
 
 export function fillTemplate(template: string, vars: Record<string, string>): string {

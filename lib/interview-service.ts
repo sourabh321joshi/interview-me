@@ -3,7 +3,7 @@ import { CreateInterviewSchema, LlmPlanSchema, timeBudget, type CreateInterviewI
 import { canTransition } from "./interview-state";
 import type { InterviewDoc, InterviewsStore, UsersStore } from "./interviews-store";
 import type { CallContext } from "./llm";
-import { loadPrompt, PROMPT_VERSION, wrapData } from "./prompts";
+import { loadPrompt, INTERVIEWER_PROMPT_VERSION, wrapData } from "./prompts";
 import type { ProfilesStore } from "./profiles-store";
 import type { ZodType } from "zod";
 
@@ -31,7 +31,7 @@ export async function createInterview(userId: string, raw: unknown, deps: Interv
   const now = deps.now?.() ?? new Date();
   const id = await deps.interviews.insert({
     user_id: userId, profile_id: profile.id, role: input.role, level: input.level, duration_seconds: input.duration_seconds,
-    mode: input.mode, prompt_version: PROMPT_VERSION, rubric_version: RUBRIC_VERSION, models,
+    mode: input.mode, prompt_version: INTERVIEWER_PROMPT_VERSION, rubric_version: RUBRIC_VERSION, models,
     expire_at: new Date(now.getTime() + 30 * DAY_MS), created_at: now,
   });
 

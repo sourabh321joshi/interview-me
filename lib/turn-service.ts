@@ -4,7 +4,7 @@ import { DomainError } from "./interview-service";
 import type { InterviewDoc, InterviewsStore, Turn } from "./interviews-store";
 import { LlmError, type CallContext, type Message } from "./llm";
 import type { ProfilesStore } from "./profiles-store";
-import { loadPrompt, wrapData } from "./prompts";
+import { loadPrompt, INTERVIEWER_PROMPT_VERSION, wrapData } from "./prompts";
 
 export const MARKER = "[END_OF_INTERVIEW]";
 export const MAX_TURNS = 40;
@@ -42,6 +42,48 @@ export class MarkerStripper {
   finish(): string { const out = this.isFinal ? "" : this.buf; this.buf = ""; return out; }
 }
 
+const ELAPSED_PREFIX = "[elapsed:";
+const elapsedTag = /\[elapsed:\s*\d+:\d{2}\s+of\s+\d+:\d{2}\]/gi;
+const hideElapsed = (text: string) => text.replace(elapsedTag, "").trimStart();
+const endRequest = /(?:^|[.!?;,\n]\s*|\s+and\s+)(?:(?:please|let['’]?s|can we|could we)\s+)?(?:end|stop|finish)(?:\s+(?:this|the|my)\s+interview|\s+now)(?:\s+please)?[.!?\s]*$/i;
+
+class ElapsedTagStripper {
+  private pending = "";
+
+  push(chunk: string) {
+    this.pending += chunk;
+    let result = "";
+    while (this.pending) {
+      const start = this.pending.indexOf("[");
+      if (start === -1) {
+        result += this.pending;
+        this.pending = "";
+        break;
+      }
+      result += this.pending.slice(0, start);
+      this.pending = this.pending.slice(start);
+      const lower = this.pending.toLowerCase();
+      if (ELAPSED_PREFIX.startsWith(lower)) break;
+      if (lower.startsWith(ELAPSED_PREFIX)) {
+        const end = this.pending.indexOf("]");
+        if (end === -1 && this.pending.length < 48) break;
+        if (end !== -1) {
+          result += this.pending.slice(0, end + 1).replace(elapsedTag, "");
+          this.pending = this.pending.slice(end + 1);
+          continue;
+        }
+      }
+      result += this.pending[0];
+      this.pending = this.pending.slice(1);
+    }
+    return result;
+  }
+
+  finish() {
+    return this.pending;
+  }
+}
+
 export type TurnEnd = { seq: number; text: string; is_final: boolean; remaining_seconds: number };
 export type TurnEvent = { type: "delta"; text: string } | ({ type: "end" } & TurnEnd);
 export type Prepared =
@@ -65,7 +107,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
   if (!iv) throw new DomainError("not_found", "Interview not found.");
   const now = deps.now?.() ?? new Date();
   const remaining = Math.max(0, Math.ceil(((iv.ends_at?.getTime() ?? 0) - now.getTime()) / 1000));
-  const replay = (t: Turn): Prepared => ({ kind: "replay", end: { seq: t.seq, text: t.text, is_final: iv.status === "completed" && t.seq === iv.turn_count - 1, remaining_seconds: remaining } });
+  const replay = (t: Turn): Prepared => ({ kind: "replay", end: { seq: t.seq, text: hideElapsed(t.text), is_final: iv.status === "completed" && t.seq === iv.turn_count - 1, remaining_seconds: remaining } });
 
   // Idempotency: a repeated request returns the stored reply instead of calling the model again.
   if (body.type === "open" && iv.turns[0]?.speaker === "interviewer") return replay(iv.turns[0]);
@@ -85,7 +127,8 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
   const elapsedMs = now.getTime() - startedAtMs;
   const smokeTest = iv.duration_seconds === SMOKE_TEST_DURATION;
   const wrapSeconds = smokeTest ? timeBudget(iv.duration_seconds).wrapup : WRAPUP_SECONDS;
-  const wrap = remaining <= wrapSeconds;
+  const wantsToEnd = body.type === "answer" && endRequest.test(existing?.text ?? body.text ?? "");
+  const wrap = wantsToEnd || remaining <= wrapSeconds;
   if (wrap) await deps.interviews.markWrappingUp(userId, id);
 
   let turns = iv.turns;
@@ -136,13 +179,13 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
     duration_minutes: String(iv.duration_seconds / 60),
     candidate_profile: wrapData("candidate_profile", briefing ? JSON.stringify(briefing) : "Not available."),
     job_description: wrapData("job_description", profile?.job_description?.slice(0, 500) || "none"),
-  }) + "\n\nINTERVIEW PLAN (data from the planner)\n" + wrapData("interview_plan", JSON.stringify(plan));
+  }, iv.prompt_version === "0.1" ? "0.1" : INTERVIEWER_PROMPT_VERSION) + "\n\nINTERVIEW PLAN (data from the planner)\n" + wrapData("interview_plan", JSON.stringify(plan));
 
   const tag = (ms: number) => `[elapsed: ${fmt(ms)} of ${fmt(iv.duration_seconds * 1000)}]`;
   const messages: Message[] = [{ role: "user", content: `${tag(0)} (The interview is starting. Greet the candidate and ask your first question.)` }];
   for (const t of turns) {
     messages.push(t.speaker === "interviewer"
-      ? { role: "assistant", content: t.text }
+      ? { role: "assistant", content: hideElapsed(t.text) }
       : { role: "user", content: `${tag(t.t_offset_ms)} ${t.kind === "system" ? "(The candidate has been silent for a while.)" : t.text}` });
   }
   if (wrap) messages[messages.length - 1].content += `\n[server note: about ${wrapSeconds} seconds remain. Give your closing message now, then add the end marker line.]`;
@@ -153,12 +196,17 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
 
   async function* run(): AsyncGenerator<TurnEvent> {
     const strip = new MarkerStripper();
+    const elapsed = new ElapsedTagStripper();
+    const chunks = wantsToEnd
+      ? [`Thanks for practicing. Your interview is complete.
+${MARKER}`]
+      : deps.llm.streamTurn({ system, messages, ctx: { user_id: userId, interview_id: id } });
     let text = "";
-    for await (const d of deps.llm.streamTurn({ system, messages, ctx: { user_id: userId, interview_id: id } })) {
-      const out = strip.push(d);
+    for await (const d of chunks) {
+      const out = elapsed.push(strip.push(d));
       if (out) { text += out; yield { type: "delta", text: out }; }
     }
-    const tail = strip.finish();
+    const tail = elapsed.push(strip.finish()) + elapsed.finish();
     if (tail) { text += tail; yield { type: "delta", text: tail }; }
     text = text.trim();
     if (!text) throw new LlmError("upstream_unavailable", "Empty reply", true);
@@ -166,7 +214,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
     const doneAt = deps.now?.() ?? new Date();
     const turn: Turn = { seq, speaker: "interviewer", kind: "text", text, t_offset_ms: doneAt.getTime() - startedAtMs, client_turn_id: null, created_at: doneAt };
     if (!(await deps.interviews.appendTurn(userId, id, seq, turn, null))) throw new DomainError("interview_not_active", "Another request is already in progress for this interview.");
-    if (strip.isFinal) await deps.interviews.complete(userId, id, "model_finished", doneAt);
+    if (strip.isFinal) await deps.interviews.complete(userId, id, wantsToEnd ? "user_ended" : "model_finished", doneAt);
     yield { type: "end", seq, text, is_final: strip.isFinal, remaining_seconds: remaining };
   }
   return { kind: "stream", start: { seq, phase, remaining_seconds: remaining }, run };
@@ -185,7 +233,7 @@ export async function getInterviewView(userId: string, id: string, deps: Pick<Tu
     id: iv.id, status: iv.status, role: iv.role, level: iv.level, mode: iv.mode, duration_seconds: iv.duration_seconds,
     started_at: iv.started_at, ends_at: iv.ends_at, server_now: now.toISOString(),
     remaining_seconds: iv.ends_at ? Math.max(0, Math.ceil((iv.ends_at.getTime() - now.getTime()) / 1000)) : null,
-    turns: iv.turns.map((t) => ({ seq: t.seq, speaker: t.speaker, kind: t.kind, text: t.text, t_offset_ms: t.t_offset_ms, client_turn_id: t.speaker === "candidate" ? t.client_turn_id : null })),
+    turns: iv.turns.map((t) => ({ seq: t.seq, speaker: t.speaker, kind: t.kind, text: t.speaker === "interviewer" ? hideElapsed(t.text) : t.text, t_offset_ms: t.t_offset_ms, client_turn_id: t.speaker === "candidate" ? t.client_turn_id : null })),
   };
 }
 

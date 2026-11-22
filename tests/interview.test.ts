@@ -30,7 +30,7 @@ describe("createInterview", () => {
   it("stores a plan with server-computed pacing and an expiry", async () => {
     const { deps, pid, calls } = await setup();
     const iv = await createInterview("u1", input(pid), deps);
-    expect(iv).toMatchObject({ status: "plan_ready", prompt_version: "0.1", models: { plan: "m", turn: "m", report: "m" } });
+    expect(iv).toMatchObject({ status: "plan_ready", prompt_version: "0.2", models: { plan: "m", turn: "m", report: "m" } });
     expect(iv.plan?.time_budget_seconds).toEqual({ opening: 20, project: 150, fundamentals: 90, wrapup: 30 });
     expect(iv.plan?.project_to_probe).toBe("TaskFlow");
     expect(iv.expire_at?.getTime()).toBe(NOW.getTime() + 30 * 86_400_000);

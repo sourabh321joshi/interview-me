@@ -109,6 +109,8 @@ ENDING
 After your wrap-up message, add a final line containing exactly: [END_OF_INTERVIEW]
 ```
 
+The app’s interviewer prompt v0.2 anchors follow-ups in concrete details from the most recent answer and keeps elapsed-time tags internal. A clear request to end the session closes it without generating another question. The same behavior applies to the one-minute development prompt.
+
 ## 4. Interview plan prompt (optional for manual tests)
 
 Run once before the interview. Its output can be added to the system prompt. In the app this becomes the plan step.

@@ -74,6 +74,28 @@ describe("turns", () => {
     expect(interviews.docs.get(id)!.turn_count).toBe(3);
   });
 
+  it("honors a clear stop request without asking the model another question", async () => {
+    const { id, deps, calls, interviews } = await startedInterview([["Tell me about TaskFlow."]]);
+    await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps));
+    const request = { client_turn_id: uid(), type: "answer", text: "I used Socket.IO, and lets end the interview" };
+    const result = end(await collect(await prepareTurn("u1", id, request, deps)));
+    expect(result).toMatchObject({ is_final: true, text: "Thanks for practicing. Your interview is complete." });
+    expect(interviews.docs.get(id)).toMatchObject({ status: "completed", end_reason: "user_ended" });
+    expect((await prepareTurn("u1", id, request, deps)).kind).toBe("replay");
+    expect(calls).toHaveLength(1);
+  });
+
+  it("hides split timing tags and keeps a technical answer about stopping a process in the interview", async () => {
+    const { id, deps, calls } = await startedInterview([["Tell me about TaskFlow."], ["[ela", "psed: 0:30", " of 5:00] How did you handle reconnecting?"]]);
+    await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps));
+    const events = await collect(await prepareTurn("u1", id, {
+      client_turn_id: uid(), type: "answer", text: "I invalidate the token and end the session.",
+    }, deps));
+    expect(text(events)).not.toContain("[");
+    expect(end(events)).toMatchObject({ is_final: false, text: "How did you handle reconnecting?" });
+    expect(calls[1].system).toContain("concrete detail from the latest answer");
+  });
+
   it("replays a finished turn without calling the model again", async () => {
     const { id, deps, calls } = await startedInterview([["Hello."], ["Why?"]]);
     await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps));
