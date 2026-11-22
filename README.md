@@ -1,6 +1,16 @@
 # Interview Me
 
-A text-only prototype for AI mock interviews: upload a resume (and optionally a GitHub username), get a short AI interview, then a feedback report with evidence from your own answers.
+Interview Me is a text-based mock interview prototype for developers. Upload a PDF résumé and optionally add your GitHub username to start an interview based on your background. The app asks follow-up questions and produces a feedback report that quotes your answers.
+
+## Interview flow
+
+1. Upload a PDF résumé and optionally add a GitHub username.
+2. Answer questions in the browser. Refreshing the page restores the conversation.
+3. End the interview to generate a report and review the evidence behind the feedback.
+
+**Stack** · Next.js, React, TypeScript, MongoDB, OpenAI, Zod
+
+[API design](docs/api-design-v0.1.md) · [Database design](docs/database-design-v0.2.md) · [System design](docs/system-design-v0.1.md)
 
 Docs are in `docs/`. Rules for coding agents are in `AGENTS.md`. Progress is in `docs/progress.md`. The M0 checkpoint guide is `docs/m0-checkpoint.md`.
 
