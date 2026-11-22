@@ -314,8 +314,8 @@ Account deletion is one function that runs in this order and is safe to rerun:
 1. Delete `reports` where `user_id` matches.
 2. Delete `interviews` where `user_id` matches.
 3. Delete `candidate_profiles` where `user_id` matches.
-4. Set `user_id` to `null` in remaining `usage_events` for the user.
-5. Delete the `app_users` document and the auth library’s user, account, and session records.
+4. Set `user_id` and `interview_id` to `null` in remaining `usage_events` for the user.
+5. Delete the `app_users` document and its rate limit counters. Better Auth deletes the user, linked accounts, and sessions.
 
 ## 8. Atlas setup and operations
 

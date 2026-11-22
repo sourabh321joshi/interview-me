@@ -88,7 +88,7 @@ Request: `{"version": "2026-11-v2", "provider": "OpenAI"}`. The provider matches
 
 ### DELETE `/me`
 
-Deletes the auth user, which cascades to all data. Response `204`.
+Deletes the signed-in account and its app data. Requires sign-in within the last five minutes. Response `204` clears the session cookies. Usage events are kept without account or interview identifiers.
 
 ## 4. Profiles
 

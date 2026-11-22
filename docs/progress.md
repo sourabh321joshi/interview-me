@@ -51,3 +51,5 @@ M1 consent records the accepted version and active processors before profile bui
 The 30-day retention rule is active in the development database. Eight interviews received deadlines and none were due immediately. An expired synthetic transcript and report were both removed by MongoDB, and the expired interview was inaccessible during cleanup. Reports show the expiry date and consent v2 explains the policy.
 
 Users can delete an interview from its feedback page. Deletion removes the interview, including its transcript, and the report in one transaction. Account deletion remains open.
+
+Account deletion is available from the signed-in Account page. A fictional account verified deletion of app records, session revocation, and preservation of another account’s data. Usage events retain counts with their account and interview identifiers cleared.
