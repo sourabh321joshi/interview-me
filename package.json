@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:gemini-report": "node --env-file=.env.local --import tsx scripts/test-gemini-report.ts",
+    "diagnose:gemini-report": "node --env-file=.env.local --import tsx scripts/diagnose-gemini-interview-report.ts",
     "db:indexes": "node --env-file=.env.local --import tsx scripts/db-indexes.ts",
     "export:interview": "node --env-file=.env.local --import tsx scripts/export-interview.ts"
   },

@@ -6,18 +6,18 @@ import { loadPrompt, wrapData } from "../lib/prompts";
 
 const model = process.env.GEMINI_MODEL_REPORT ?? "gemini-3.1-flash-lite";
 const answers = [
-  "For duplicate requests, I would use an idempotency key and store the first response so retries do not create duplicate work.",
-  "A database index speeds up reads for indexed fields, but it adds storage and makes writes a little slower.",
-  "I would reproduce the bug, add a regression test, then inspect the logs around the failing request before changing code.",
+  "I chose server-side validation because clients can be bypassed. I added a regression test so empty task titles stay rejected.",
+  "MongoDB keeps tasks after a restart. I would add an index for the owner and creation date so listing tasks stays fast as data grows.",
 ];
 const transcript = answers.map((answer) => `Candidate: ${answer}`).join("\n");
 const events: UsageEvent[] = [];
 const gemini = createGeminiProvider();
 let requestCount = 0;
+const maxRequests = 2;
 const provider: LlmProvider = {
   name: gemini.name,
   async generate(req) {
-    if (requestCount > 0) throw new LlmError("invalid_output", "Smoke test is limited to one Gemini request");
+    if (requestCount >= maxRequests) throw new LlmError("invalid_output", `Diagnostic is limited to ${maxRequests} Gemini requests`);
     requestCount++;
     return gemini.generate(req);
   },
@@ -33,7 +33,7 @@ const llm = createLlm({
 async function main() {
   const report = await llm.generateJson("report", buildReportSchema(answers), {
     system: loadPrompt("report", {
-      role_and_level: "junior JavaScript developer",
+      role_and_level: "frontend, fresher",
       transcript: wrapData("transcript", transcript),
     }),
     messages: [{ role: "user", content: "Evaluate the fictional interview and return the report JSON now." }],
