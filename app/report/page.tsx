@@ -5,6 +5,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import type { Dimension, Report } from "@/lib/report-schema";
 import TranscriptView, { type TranscriptTurn } from "./transcript-view";
+import ReportWrapUp from "./report-wrap-up";
 
 type InterviewDetails = {
   role: "frontend" | "backend" | "fullstack";
@@ -16,7 +17,7 @@ type InterviewDetails = {
 
 type State =
   | { kind: "loading" } | { kind: "pending" } | { kind: "error"; message: string }
-  | { kind: "failed"; canRegenerate: boolean } | { kind: "ready"; report: Report; details: InterviewDetails | null };
+  | { kind: "failed"; canRegenerate: boolean } | { kind: "ready"; report: Report; details: InterviewDetails | null; showWrapUp: boolean };
 
 const LABELS: Record<Dimension, string> = { problem_solving: "Problem solving", technical_depth: "Technical depth", fundamentals: "Fundamentals", communication: "Communication" };
 const ROLES: Record<InterviewDetails["role"], string> = { frontend: "Frontend", backend: "Backend", fullstack: "Full-stack" };
@@ -40,27 +41,34 @@ export default function ReportPage() {
     const interview = new URLSearchParams(window.location.search).get("interview") ?? "";
     let stop = false;
     async function poll() {
+      if (stop) return;
+      let showedPending = false;
       if (!interview) return setState({ kind: "error", message: "No interview selected." });
       setId(interview);
       while (!stop) {
         try {
           const res = await fetch(`/api/v1/interviews/${interview}/report`);
           const json = await res.json();
+          if (stop) return;
           if (!res.ok) return setState({ kind: "error", message: json?.error?.message ?? "Could not load the report." });
           if (json.status === "ready") {
             // The report endpoint has the rubric; session details come from the interview.
             const details = await fetch(`/api/v1/interviews/${interview}`)
               .then((response) => response.ok ? response.json() : null)
               .catch(() => null);
-            if (!stop) setState({ kind: "ready", report: json, details });
+            if (!stop) setState({ kind: "ready", report: json, details, showWrapUp: showedPending });
             return;
           }
           if (json.status === "failed") return setState({ kind: "failed", canRegenerate: !!json.can_regenerate });
+          showedPending = true;
           setState({ kind: "pending" });
+          const retrySeconds = Number(res.headers.get("Retry-After"));
+          const delay = Number.isFinite(retrySeconds) && retrySeconds > 0 ? retrySeconds * 1000 : 3000;
+          await new Promise((resolve) => setTimeout(resolve, delay));
         } catch {
-          return setState({ kind: "error", message: "Network problem. Reload to try again." });
+          if (!stop) setState({ kind: "error", message: "Network problem. Reload to try again." });
+          return;
         }
-        await new Promise((r) => setTimeout(r, 3000));
       }
     }
     Promise.resolve().then(poll);
@@ -75,14 +83,22 @@ export default function ReportPage() {
     }
   }, [showTranscript, state.kind]);
 
+  function openReport() {
+    setState((current) => current.kind === "ready" ? { ...current, showWrapUp: false } : current);
+  }
+
   async function regenerate() {
     await fetch(`/api/v1/interviews/${id}/report/regenerate`, { method: "POST" });
     window.location.reload();
   }
 
+  if (state.kind === "pending") return <ReportWrapUp ready={false} onViewReport={openReport} />;
+
   if (state.kind === "ready" && showTranscript) {
     return <TranscriptView report={state.report} startedAt={state.details?.started_at ?? null} turns={state.details?.turns ?? null} />;
   }
+
+  if (state.kind === "ready" && state.showWrapUp) return <ReportWrapUp ready onViewReport={openReport} />;
 
   return (
     <main id="report" tabIndex={-1} className="mx-auto max-w-5xl px-5 pb-12 sm:px-8">
@@ -91,7 +107,6 @@ export default function ReportPage() {
       </header>
       <h1 className="mt-9 text-3xl font-semibold tracking-tight sm:mt-12 sm:text-4xl">Your interview feedback</h1>
       {state.kind === "loading" && <p className="mt-4 text-muted">Loading…</p>}
-      {state.kind === "pending" && <p role="status" className="mt-4 text-muted">We are preparing your feedback. This usually takes under a minute.</p>}
       {state.kind === "error" && <p role="alert" className="mt-4 text-red-300">{state.message} <a className="underline" href={id ? `/interview?interview=${id}` : "/interview"}>Back to the interview</a></p>}
       {state.kind === "failed" && (
         <div role="alert" className="mt-4 space-y-2">
