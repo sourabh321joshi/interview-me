@@ -57,3 +57,7 @@ Account deletion is available from the signed-in Account page. A fictional accou
 Basic interview history lists the signed-in user’s unexpired attempts with available rubric scores and links to feedback. Older attempts can be loaded with the history cursor.
 
 The signed-in account status endpoint returns the display name, remaining free interviews, paid credits, and consent status for the active processors.
+
+## M2 voice
+
+A one-minute local microphone test is available at /voice-test with simulated captions and an on-device interviewer voice sample where supported. Live transcription accuracy and latency still need a provider-backed test.

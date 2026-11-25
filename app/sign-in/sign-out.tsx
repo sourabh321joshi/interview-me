@@ -6,6 +6,7 @@ const client = createAuthClient();
 export default function SignOut() {
   const [failed, setFailed] = useState(false);
   return <div className="mx-auto max-w-5xl px-5 pt-3 text-right">
+    <Link className="mr-4 underline" href="/voice-test">Voice test</Link>
     <Link className="mr-4 underline" href="/history">History</Link>
     <Link className="mr-4 underline" href="/account">Account</Link>
     <button onClick={async () => {
