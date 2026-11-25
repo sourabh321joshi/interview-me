@@ -83,3 +83,5 @@ The interview room now has a Live captions checkbox, enabled by default. It cont
 The interview room can play the latest completed interviewer question with an on-device English voice. Playback and microphone capture are mutually exclusive. Deepgram Aura voice and audio format selection remain open.
 
 A disposable one-minute interview in Edge verified first-click playback, Stop playback, replay to completion, and microphone control locking. Device voice loading starts when the room mounts. The test used a prewritten question and no AI API calls.
+
+The voice test offers opt-in Asteria and Luna Aura MP3 previews of a fixed UPI question. Replays reuse the sample while the page is open. Interview voice selection awaits listening feedback.

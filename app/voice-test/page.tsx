@@ -1,3 +1,4 @@
+import AuraPreview from "./aura-preview";
 import LiveCaptions from "./live-captions";
 import Link from "next/link";
 import VoiceTest from "./voice-test";
@@ -8,6 +9,7 @@ export default function Page() {
     <h1 className="text-3xl font-semibold">Voice test</h1>
     <p className="text-muted">Choose live transcription or the local microphone and voice preview.</p>
     <LiveCaptions />
+    <AuraPreview />
     <VoiceTest />
   </main>;
 }
