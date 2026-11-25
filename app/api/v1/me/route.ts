@@ -1,5 +1,12 @@
+import { getAccountStatus } from "@/lib/account-status";
 import { apiError } from "@/lib/api-error";
 import { getAuth } from "@/lib/auth";
+
+export async function GET(request: Request) {
+  const session = await (await getAuth()).api.getSession({ headers: request.headers });
+  if (!session) return apiError("unauthenticated", "Sign in to continue.");
+  return Response.json(await getAccountStatus(session.user), { headers: { "Cache-Control": "private, no-store" } });
+}
 
 export async function DELETE(request: Request) {
   const headers = new Headers(request.headers);

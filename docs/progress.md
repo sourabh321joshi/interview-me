@@ -55,3 +55,5 @@ Users can delete an interview from its feedback page. Deletion removes the inter
 Account deletion is available from the signed-in Account page. A fictional account verified deletion of app records, session revocation, and preservation of another account’s data. Usage events retain counts with their account and interview identifiers cleared.
 
 Basic interview history lists the signed-in user’s unexpired attempts with available rubric scores and links to feedback. Older attempts can be loaded with the history cursor.
+
+The signed-in account status endpoint returns the display name, remaining free interviews, paid credits, and consent status for the active processors.
