@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export default function LiveCaptions() {
+export default function LiveCaptions({ interviewId, onWords, onRecording }: { interviewId?: string; onWords?: (words: string) => void; onRecording?: (active: boolean) => void }) {
   const [active, setActive] = useState(false);
   const [status, setStatus] = useState("");
   const [caption, setCaption] = useState("");
@@ -15,6 +15,7 @@ export default function LiveCaptions() {
     let closed = false;
     let stopping = false;
     let finalText = "";
+    let interim = "";
     let mic: MediaStream | undefined;
     let socket: WebSocket | undefined;
     let recorder: MediaRecorder | undefined;
@@ -32,7 +33,9 @@ export default function LiveCaptions() {
     }
     function end(message: string) {
       if (closed) return;
+      if (interim) onWords?.(interim);
       release();
+      onRecording?.(false);
       setStatus(message);
       setActive(false);
     }
@@ -48,6 +51,7 @@ export default function LiveCaptions() {
     }
     cancel.current = release;
     finish.current = stop;
+    onRecording?.(true);
     setActive(true);
     setCaption("");
     setStatus("Waiting for microphone permission…");
@@ -59,11 +63,22 @@ export default function LiveCaptions() {
       mic.getAudioTracks()[0].addEventListener("ended", stop, { once: true });
       setStatus("Connecting to Deepgram…");
       timer = window.setTimeout(() => end("Connection timed out. Try again."), 15000);
-      const response = await fetch("/api/v1/voice-test/token", { method: "POST", signal: abort.signal });
+      const response = await fetch(interviewId ? "/api/v1/voice/stt-token" : "/api/v1/voice-test/token", {
+        method: "POST", signal: abort.signal,
+        headers: interviewId ? { "Content-Type": "application/json" } : undefined,
+        body: interviewId ? JSON.stringify({ interview_id: interviewId }) : undefined,
+      });
       const data = await response.json();
       if (closed) return;
       if (!response.ok) return end(data.error?.message ?? "Could not connect.");
-      const ws = new WebSocket("wss://api.deepgram.com/v1/listen?model=nova-3&language=multi&smart_format=true&interim_results=true", ["bearer", data.access_token]);
+      const url = new URL(data.ws_url ?? "wss://api.deepgram.com/v1/listen");
+      const params = data.connect_params;
+      url.search = new URLSearchParams({ model: params?.model ?? "nova-3", language: params?.language ?? "multi", smart_format: "true", interim_results: "true" }).toString();
+      if (params) {
+        url.searchParams.set("endpointing", String(params.endpointing));
+        for (const term of params.keyterms) url.searchParams.append("keyterm", term);
+      }
+      const ws = new WebSocket(url, ["bearer", data.access_token]);
       socket = ws;
       recorder.ondataavailable = event => {
         if (!closed && ws.readyState === WebSocket.OPEN && event.data.size) ws.send(event.data);
@@ -85,8 +100,12 @@ export default function LiveCaptions() {
         if (result.type !== "Results") return;
         const words = result.channel?.alternatives?.[0]?.transcript ?? "";
         const text = [finalText, words].filter(Boolean).join(" ");
-        if (result.is_final) finalText = text;
-        setCaption(text);
+        interim = result.is_final ? "" : words;
+        if (result.is_final) {
+          finalText = text;
+          if (words) onWords?.(words);
+        }
+        setCaption(interviewId ? interim : text);
       };
       ws.onerror = () => end("Deepgram connection failed. Try the local microphone test.");
       ws.onclose = () => end(stopping ? "Stopped." : "Deepgram disconnected.");
@@ -94,6 +113,11 @@ export default function LiveCaptions() {
       end("Could not start live captions. Check your microphone permission and connection.");
     }
   }
+  if (interviewId) return <div className="space-y-1 text-sm">
+    <button type="button" className="rounded-lg border border-line px-3 py-1 font-semibold" onClick={active ? () => finish.current?.() : start}>{active ? "Finish dictation" : "Dictate answer"}</button>
+    <p className="text-xs text-muted">Dictation sends microphone audio and profile skill terms to Deepgram. Review your answer before sending.</p>
+    <p role="status">{status} {active && caption}</p>
+  </div>;
   return <section className="surface space-y-4 p-5">
     <h2 className="font-semibold">Live captions</h2>
     <p className="text-muted">Starting sends microphone audio to Deepgram for up to one minute. Speak in English or Hinglish. Deepgram usage charges may apply.</p>

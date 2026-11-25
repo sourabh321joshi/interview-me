@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import LiveCaptions from "../voice-test/live-captions";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 export type RoomTurn = { speaker: "interviewer" | "candidate"; text: string };
 
@@ -16,7 +17,7 @@ type Props = {
   ending: boolean;
   error: string;
   draft: string;
-  onDraft: (value: string) => void;
+  onDraft: Dispatch<SetStateAction<string>>;
   onSend: () => Promise<void>;
   onRetry: () => void;
   onEnd: () => Promise<void>;
@@ -30,6 +31,7 @@ export default function InterviewRoom({
   interviewId, turns, live, remaining, finished, replying, awaitingReply, ending,
   error, draft, onDraft, onSend, onRetry, onEnd,
 }: Props) {
+  const [recording, setRecording] = useState(false);
   const transcript = useRef<HTMLOListElement>(null);
   const expired = remaining === 0;
   const busy = replying || ending;
@@ -104,8 +106,10 @@ export default function InterviewRoom({
           </div>
         )}
         {!finished && (
-          <form onSubmit={(event) => { event.preventDefault(); if (canAnswer) void onSend(); }}
+          <form onSubmit={(event) => { event.preventDefault(); if (canAnswer && !recording) void onSend(); }}
             className="space-y-2 border-t border-line px-4 py-3 sm:px-6">
+            {canAnswer && <LiveCaptions interviewId={interviewId} onRecording={setRecording}
+              onWords={words => onDraft(previous => [previous.trimEnd(), words].filter(Boolean).join(" ").slice(0, 2000))} />}
             <label htmlFor="interview-answer" className="block text-sm font-semibold">Your answer</label>
             <div className="flex items-end gap-2">
               <textarea id="interview-answer" value={draft} onChange={(event) => onDraft(event.target.value)}
@@ -118,7 +122,7 @@ export default function InterviewRoom({
                 }}
                 className="field flex-1 resize-none"
                 placeholder={expired ? "The interview time has ended." : awaitingReply ? "Wait for the interviewer’s reply." : "Type your answer…"} />
-              <button disabled={!canAnswer || !draft.trim()} className="action shrink-0">Send</button>
+              <button disabled={!canAnswer || recording || !draft.trim()} className="action shrink-0">Send</button>
             </div>
             <p id="interview-answer-hint" className="text-xs text-muted">Enter to send. Shift + Enter for a new line.</p>
           </form>

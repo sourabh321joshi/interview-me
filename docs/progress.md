@@ -65,3 +65,7 @@ A one-minute local microphone test is available at /voice-test with simulated ca
 The voice test page now offers opt-in live captions using an authenticated temporary Deepgram token. Local Edge testing with a disposable account reached token issuance. Deepgram returned 403 FORBIDDEN for the configured key, so live microphone transcription is pending a key with Member permission.
 
 After the key update, a signed-in Edge test streamed synthetic microphone audio and displayed the live caption 'Caching to improve'. The test stopped early and the disposable account was deleted. Hinglish accuracy and latency on a real microphone remain unmeasured.
+
+Active interviews now support optional dictation into the editable answer draft. Finalized phrases append to typed text and the candidate explicitly sends the reviewed answer. Voice grants require ownership, current consent and remaining interview time, with five attempts per interview.
+
+Verified a disposable one-minute interview in Edge with synthetic microphone audio. Dictation populated the answer textarea and Send became available after stopping. The draft was left unsent and the disposable account was deleted.
