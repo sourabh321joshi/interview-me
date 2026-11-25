@@ -72,7 +72,10 @@ export function createLlm(deps: LlmDeps) {
         await record(role, model, input.ctx, res.usage, startedAt);
         return res.text;
       } catch (err) {
-        if (attempt === 0 && err instanceof LlmError && err.retryable) continue;
+        if (attempt === 0 && err instanceof LlmError && err.retryable) {
+          if (err.providerStatus === 503) await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
         throw err;
       }
     }
@@ -114,7 +117,10 @@ export function createLlm(deps: LlmDeps) {
         }
         return;
       } catch (err) {
-        if (attempt === 0 && !yielded && err instanceof LlmError && err.retryable) continue;
+        if (attempt === 0 && !yielded && err instanceof LlmError && err.retryable) {
+          if (err.providerStatus === 503) await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
         throw err;
       }
     }

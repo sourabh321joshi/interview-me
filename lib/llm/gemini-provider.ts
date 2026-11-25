@@ -19,8 +19,8 @@ function mapUsage(u: GeminiUsage | undefined): Usage {
 }
 
 function toLlmError(status?: number): LlmError {
-  // Keep this provider single-attempt: a smoke test should never silently spend twice.
-  return new LlmError("upstream_unavailable", `Gemini request failed${status ? ` (${status})` : ""}`, false, status);
+  // Only retry an explicit service refusal, before any generated content is received.
+  return new LlmError("upstream_unavailable", `Gemini request failed${status ? ` (${status})` : ""}`, status === 503, status);
 }
 
 function body(req: LlmRequest) {

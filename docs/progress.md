@@ -71,3 +71,5 @@ Active interviews now support optional dictation into the editable answer draft.
 Verified a disposable one-minute interview in Edge with synthetic microphone audio. Dictation populated the answer textarea and Send became available after stopping. The draft was left unsent and the disposable account was deleted.
 
 Profile recovery: provider HTTP status is preserved on future failed builds. Users can enter a profile through the existing editor without AI generation, and failure of optional GitHub summarization preserves a successful resume summary.
+
+Interview planning now retries a Gemini 503 once after a short delay, using the existing model wrapper. Persistent service unavailability and provider quota errors are distinguished in API responses.

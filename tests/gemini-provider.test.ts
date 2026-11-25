@@ -56,7 +56,12 @@ describe("Gemini provider", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("does not mark upstream failures retryable", async () => {
+  it("marks a temporary service refusal for one retry", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 503 })));
+    await expect(createGeminiProvider("test-secret").generate(request)).rejects.toMatchObject({ providerStatus: 503, retryable: true });
+  });
+
+  it("does not mark quota failures retryable", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 429 })));
     await expect(createGeminiProvider("test-secret").generate(request)).rejects.toMatchObject({ retryable: false });
   });
