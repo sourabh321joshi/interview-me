@@ -21,6 +21,7 @@ export class LlmError extends Error {
     public code: "upstream_unavailable" | "invalid_output" | "config",
     message: string,
     public retryable = false,
+    public providerStatus?: number,
   ) {
     super(message);
     this.name = "LlmError";

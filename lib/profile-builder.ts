@@ -1,9 +1,9 @@
 import { fetchGithubRepos, type GithubWarning, type RepoInfo } from "./github";
 import { LlmGithubSchema, ProfileSummarySchema, type GithubSummary, type ProfileSummary } from "./schemas";
 import { loadPrompt, wrapData } from "./prompts";
-import type { CallContext } from "./llm";
+import { LlmError, type CallContext } from "./llm";
 
-export type Warning = GithubWarning | "resume_text_short";
+export type Warning = GithubWarning | "resume_text_short" | "github_summary_unavailable";
 type Llm = { generateJson: <T>(role: "profile", schema: import("zod").ZodType<T>, input: { system: string; messages: { role: "user"; content: string }[]; ctx?: CallContext }) => Promise<T> };
 
 export const MIN_RESUME_CHARS = 50;
@@ -26,11 +26,18 @@ export async function buildProfile(
     const gh = await fetchGithubRepos(input.githubUsername, { fetchImpl: deps.fetchImpl, token: deps.githubToken });
     if (!gh.ok) warnings.push(gh.warning);
     else if (gh.repos.length > 0) {
-      const llmOut = await deps.llm.generateJson("profile", LlmGithubSchema, {
-        system: loadPrompt("github-summary"),
-        messages: [{ role: "user", content: wrapData("repositories", formatRepos(gh.repos)) }],
-        ctx: input.ctx,
-      });
+      let llmOut;
+      try {
+        llmOut = await deps.llm.generateJson("profile", LlmGithubSchema, {
+          system: loadPrompt("github-summary"),
+          messages: [{ role: "user", content: wrapData("repositories", formatRepos(gh.repos)) }],
+          ctx: input.ctx,
+        });
+      } catch (err) {
+        if (!(err instanceof LlmError)) throw err;
+        warnings.push("github_summary_unavailable");
+        return { summary, github_summary, warnings };
+      }
       github_summary = {
         schema_version: 1,
         fetched_at: (deps.now?.() ?? new Date()).toISOString(),

@@ -52,3 +52,13 @@ export function createMongoProfilesStore(): ProfilesStore {
     },
   };
 }
+
+export async function saveManualProfile(userId: string, summary: ProfileSummary, jobDescription: string) {
+  const now = new Date();
+  const result = await (await getDb()).collection(COLLECTIONS.candidate_profiles).insertOne({
+    user_id: userId, status: "ready", summary, job_description: jobDescription || null,
+    github_username: null, github_summary: null, error_code: null, schema_version: 1,
+    created_at: now, updated_at: now,
+  });
+  return result.insertedId.toString();
+}

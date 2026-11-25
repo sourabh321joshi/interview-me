@@ -44,7 +44,15 @@ export async function POST(request: Request) {
     }, { status: 201 });
   } catch (err) {
     if (err instanceof ProfileInputError) return apiError("validation_failed", err.message);
-    if (err instanceof LlmError && err.code !== "config") return apiError("upstream_unavailable", "We couldn't build your profile. Please try again.", { retryable: true });
+    if (err instanceof LlmError) {
+      const status = err.providerStatus;
+      let message = "The profile service could not complete the request.";
+      if (status === 429) message = "The AI provider reached its request or usage limit.";
+      else if (status === 401 || status === 403 || err.code === "config") message = "The profile service needs its API credentials or configuration checked.";
+      else if (status === 404) message = "The configured profile model is unavailable.";
+      else if (err.code === "invalid_output") message = "The AI response did not match the profile format.";
+      return apiError("upstream_unavailable", message + " You can enter your profile manually.", { profile_failed: true, provider_status: status });
+    }
     return apiError("internal", "Something went wrong building your profile.");
   }
 }

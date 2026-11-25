@@ -20,6 +20,7 @@ type Props = {
 };
 
 const WARNING_MESSAGES: Record<Warning, string> = {
+  github_summary_unavailable: "Your resume profile is ready. The AI provider could not summarize your GitHub repositories.",
   github_not_found: "We couldn’t find that GitHub profile. We used your resume to build this profile.",
   github_rate_limited: "GitHub temporarily limited requests. We used your resume to build this profile.",
   github_unavailable: "We couldn’t reach GitHub. We used your resume to build this profile.",

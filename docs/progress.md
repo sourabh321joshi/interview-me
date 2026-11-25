@@ -69,3 +69,5 @@ After the key update, a signed-in Edge test streamed synthetic microphone audio 
 Active interviews now support optional dictation into the editable answer draft. Finalized phrases append to typed text and the candidate explicitly sends the reviewed answer. Voice grants require ownership, current consent and remaining interview time, with five attempts per interview.
 
 Verified a disposable one-minute interview in Edge with synthetic microphone audio. Dictation populated the answer textarea and Send became available after stopping. The draft was left unsent and the disposable account was deleted.
+
+Profile recovery: provider HTTP status is preserved on future failed builds. Users can enter a profile through the existing editor without AI generation, and failure of optional GitHub summarization preserves a successful resume summary.

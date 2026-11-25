@@ -27,7 +27,7 @@ export async function createProfile(
     const profile = (await deps.store.findOwned(userId, id))!;
     return { profile, warnings: built.warnings };
   } catch (err) {
-    await deps.store.markFailed(userId, id, err instanceof LlmError ? err.code : "internal");
+    await deps.store.markFailed(userId, id, err instanceof LlmError ? [err.code, err.providerStatus].filter(Boolean).join("_") : "internal");
     throw err;
   }
 }

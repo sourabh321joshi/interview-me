@@ -6,12 +6,13 @@ import { useRef, useState } from "react";
 const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 
 type Props = {
+  onManual: (job: string) => void;
   onBuild: (form: FormData) => Promise<void>;
   busy: string;
   error: string;
 };
 
-export default function AddContext({ onBuild, busy, error }: Props) {
+export default function AddContext({ onBuild, onManual, busy, error }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [resume, setResume] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
@@ -97,6 +98,7 @@ export default function AddContext({ onBuild, busy, error }: Props) {
             </label>
             <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5">
               <button type="submit" className="action" disabled={!resume || !!fileError}>Build my profile</button>
+              <button type="button" className="text-sm font-semibold underline" onClick={event => onManual(String(new FormData(event.currentTarget.form!).get("job_description") ?? "").trim())}>Enter profile manually</button>
               <p className="text-sm text-muted">Your resume PDF is discarded after processing.</p>
             </div>
           </fieldset>

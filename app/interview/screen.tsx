@@ -56,6 +56,7 @@ export default function InterviewPage() {
   const router = useRouter();
   const [stage, setStage] = useState<"context" | "review" | "setup" | "chat">("context");
   const [profile, setProfile] = useState<{ id: string; summary: ProfileSummary; warnings?: Warning[] } | null>(null);
+  const [manualJob, setManualJob] = useState("");
   const [interviewId, setInterviewId] = useState("");
   const [turns, setTurns] = useState<RoomTurn[]>([]);
   const [live, setLive] = useState("");
@@ -143,7 +144,14 @@ export default function InterviewPage() {
     setError("");
     setBusy("Saving your profile…");
     try {
-      if (Object.keys(changes).length) {
+      if (!profile.id) {
+        const saved = await api("/api/v1/profiles/manual", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ summary: { ...profile.summary, ...changes }, job_description: manualJob }),
+        });
+        setProfile(saved);
+        plannedInterview.current = null;
+      } else if (Object.keys(changes).length) {
         const saved = await api(`/api/v1/profiles/${profile.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -223,7 +231,12 @@ export default function InterviewPage() {
     return (
       <>
         <div hidden={stage !== "context"}>
-          <AddContext onBuild={buildProfile} busy={busy} error={error} />
+          <AddContext onManual={job => {
+            setManualJob(job);
+            setProfile({ id: "", summary: { schema_version: 1, first_name: "", years_experience: 0, education: [], experience: [], skills: [], projects: [] } });
+            setError("");
+            setStage("review");
+          }} onBuild={buildProfile} busy={busy} error={error} />
         </div>
         {stage === "review" && profile && (
           <ReviewProfile summary={profile.summary} warnings={profile.warnings} busy={!!busy} error={error} onContinue={saveProfile}
