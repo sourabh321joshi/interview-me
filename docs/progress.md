@@ -73,3 +73,5 @@ Verified a disposable one-minute interview in Edge with synthetic microphone aud
 Profile recovery: provider HTTP status is preserved on future failed builds. Users can enter a profile through the existing editor without AI generation, and failure of optional GitHub summarization preserves a successful resume summary.
 
 Interview planning now retries a Gemini 503 once after a short delay, using the existing model wrapper. Persistent service unavailability and provider quota errors are distinguished in API responses.
+
+Gemini can now use GEMINI_FALLBACK_MODEL on the existing single retry after a 503. The development fallback, gemini-3.5-flash-lite, returned a successful synthetic response. Usage events record the responding model.

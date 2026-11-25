@@ -51,6 +51,13 @@ export function createLlm(deps: LlmDeps) {
   const models = deps.models ?? ((r: Role) => getModel(r));
   const now = deps.now ?? Date.now;
 
+  async function retryModel(primary: string) {
+    const fallback = deps.provider.name === "gemini" && process.env.GEMINI_FALLBACK_MODEL?.trim();
+    if (fallback && fallback !== primary) return fallback;
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return primary;
+  }
+
   async function record(role: Role, model: string, ctx: CallContext | undefined, usage: Usage, startedAt: number) {
     try {
       await deps.sink.record({
@@ -64,7 +71,7 @@ export function createLlm(deps: LlmDeps) {
   }
 
   async function generateText(role: Role, input: CallInput, json: boolean): Promise<string> {
-    const model = models(role);
+    let model = models(role);
     for (let attempt = 0; ; attempt++) {
       const startedAt = now();
       try {
@@ -73,7 +80,7 @@ export function createLlm(deps: LlmDeps) {
         return res.text;
       } catch (err) {
         if (attempt === 0 && err instanceof LlmError && err.retryable) {
-          if (err.providerStatus === 503) await new Promise(resolve => setTimeout(resolve, 1000));
+          if (err.providerStatus === 503) model = await retryModel(model);
           continue;
         }
         throw err;
@@ -106,7 +113,7 @@ export function createLlm(deps: LlmDeps) {
 
   // Streams text deltas for an interview turn. Retries once only if nothing was sent yet.
   async function* streamTurn(input: CallInput): AsyncGenerator<string> {
-    const model = models("turn");
+    let model = models("turn");
     let yielded = false;
     for (let attempt = 0; ; attempt++) {
       const startedAt = now();
@@ -118,7 +125,7 @@ export function createLlm(deps: LlmDeps) {
         return;
       } catch (err) {
         if (attempt === 0 && !yielded && err instanceof LlmError && err.retryable) {
-          if (err.providerStatus === 503) await new Promise(resolve => setTimeout(resolve, 1000));
+          if (err.providerStatus === 503) model = await retryModel(model);
           continue;
         }
         throw err;

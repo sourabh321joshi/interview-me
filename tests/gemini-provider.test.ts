@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createLlm } from "@/lib/llm";
+import { z } from "zod";
 import { createGeminiProvider } from "@/lib/llm/gemini-provider";
 
 const request = {
@@ -29,6 +31,22 @@ describe("Gemini provider", () => {
       generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2048 },
     });
     expect(result).toEqual({ text: "{\"ok\":true}", usage: { input_tokens: 12, output_tokens: 4, cached_input_tokens: 2 } });
+  });
+
+  it("uses the configured fallback on a 503 and records the model that answered", async () => {
+    vi.stubEnv("GEMINI_FALLBACK_MODEL", "backup");
+    try {
+      const fetchMock = vi.fn().mockResolvedValueOnce(new Response("", { status: 503 }))
+        .mockResolvedValueOnce(Response.json({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }));
+      vi.stubGlobal("fetch", fetchMock);
+      const record = vi.fn();
+      const llm = createLlm({ provider: createGeminiProvider("test-secret"), sink: { record }, models: () => "primary" });
+      await llm.generateJson("plan", z.object({}), { system: "test", messages: [] });
+      expect(fetchMock.mock.calls.map(call => new URL(call[0]).pathname)).toEqual([
+        "/v1beta/models/primary:generateContent", "/v1beta/models/backup:generateContent",
+      ]);
+      expect(record).toHaveBeenCalledWith(expect.objectContaining({ model: "backup" }));
+    } finally { vi.unstubAllEnvs(); }
   });
 
   it("streams text deltas and final usage from SSE", async () => {
