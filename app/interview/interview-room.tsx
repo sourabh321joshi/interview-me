@@ -32,6 +32,8 @@ export default function InterviewRoom({
   error, draft, onDraft, onSend, onRetry, onEnd,
 }: Props) {
   const [recording, setRecording] = useState(false);
+  const [showCaptions, setShowCaptions] = useState(true);
+  const visibleLive = showCaptions ? live : "";
   const transcript = useRef<HTMLOListElement>(null);
   const expired = remaining === 0;
   const busy = replying || ending;
@@ -43,7 +45,7 @@ export default function InterviewRoom({
   useEffect(() => {
     const list = transcript.current;
     if (list) list.scrollTop = list.scrollHeight;
-  }, [turns, live]);
+  }, [turns, visibleLive]);
 
   return (
     <main className="mx-auto flex h-dvh max-w-5xl flex-col px-4 py-4 sm:px-8 sm:py-7">
@@ -73,7 +75,14 @@ export default function InterviewRoom({
       <section className="surface mt-4 flex min-h-0 flex-1 flex-col overflow-hidden" aria-labelledby="conversation-title">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-6">
           <h2 id="conversation-title" className="text-sm font-semibold">Conversation</h2>
-          <p role="status" className="text-sm text-muted">{status}</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p role="status" className="text-sm text-muted">{status}</p>
+            {!finished && <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input type="checkbox" checked={showCaptions} onChange={event => setShowCaptions(event.target.checked)}
+                className="size-4 accent-indigo-500" />
+              Live captions
+            </label>}
+          </div>
         </div>
         <ol ref={transcript} aria-label="Interview transcript" tabIndex={0}
           className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 [overflow-anchor:none] focus-visible:outline-offset-[-3px] sm:px-6">
@@ -89,10 +98,10 @@ export default function InterviewRoom({
               </div>
             </li>
           ))}
-          {live && (
+          {visibleLive && (
             <li className="max-w-[90%] sm:max-w-[78%]">
               <p className="mb-1.5 text-xs font-semibold text-muted">Interviewer</p>
-              <p className="whitespace-pre-wrap break-words rounded-xl border border-line bg-background px-3.5 py-2.5 text-sm leading-relaxed sm:text-base">{live}</p>
+              <p className="whitespace-pre-wrap break-words rounded-xl border border-line bg-background px-3.5 py-2.5 text-sm leading-relaxed sm:text-base">{visibleLive}</p>
             </li>
           )}
           {!turns.length && !live && replying && <li className="text-sm text-muted">Waiting for your first question…</li>}
@@ -124,7 +133,7 @@ export default function InterviewRoom({
                 placeholder={expired ? "The interview time has ended." : awaitingReply ? "Wait for the interviewer’s reply." : "Type your answer…"} />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-            {canAnswer && <LiveCaptions interviewId={interviewId} onRecording={setRecording}
+            {canAnswer && <LiveCaptions interviewId={interviewId} showCaptions={showCaptions} onRecording={setRecording}
               onWords={words => onDraft(previous => [previous.trimEnd(), words].filter(Boolean).join(" ").slice(0, 2000))} />}
                 <p id="interview-answer-hint" className="mt-1 hidden text-xs text-muted sm:block">Enter to send � Shift + Enter for a new line</p>
               </div>
