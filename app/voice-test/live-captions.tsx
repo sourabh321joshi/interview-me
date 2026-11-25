@@ -115,8 +115,8 @@ export default function LiveCaptions({ interviewId, onWords, onRecording }: { in
   }
   if (interviewId) return <div className="space-y-1 text-sm">
     <button type="button" className="rounded-lg border border-line px-3 py-1 font-semibold" onClick={active ? () => finish.current?.() : start}>{active ? "Finish dictation" : "Dictate answer"}</button>
-    <p className="text-xs text-muted">Dictation sends microphone audio and profile skill terms to Deepgram. Review your answer before sending.</p>
-    <p role="status">{status} {active && caption}</p>
+    <p className="text-xs text-muted">Dictation shares audio and profile skill terms with Deepgram.</p>
+    <p role="status" className="max-h-16 overflow-y-auto break-words text-sm text-indigo-200">{status}{active && caption ? " · " + caption : ""}</p>
   </div>;
   return <section className="surface space-y-4 p-5">
     <h2 className="font-semibold">Live captions</h2>

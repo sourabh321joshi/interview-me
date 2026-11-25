@@ -107,24 +107,29 @@ export default function InterviewRoom({
         )}
         {!finished && (
           <form onSubmit={(event) => { event.preventDefault(); if (canAnswer && !recording) void onSend(); }}
-            className="space-y-2 border-t border-line px-4 py-3 sm:px-6">
-            {canAnswer && <LiveCaptions interviewId={interviewId} onRecording={setRecording}
-              onWords={words => onDraft(previous => [previous.trimEnd(), words].filter(Boolean).join(" ").slice(0, 2000))} />}
-            <label htmlFor="interview-answer" className="block text-sm font-semibold">Your answer</label>
-            <div className="flex items-end gap-2">
+            className="max-h-[60dvh] shrink-0 space-y-2 overflow-y-auto border-t border-line px-4 py-3 sm:px-6">
+            <div className="flex items-baseline justify-between gap-3">
+              <label htmlFor="interview-answer" className="text-base font-semibold">Your answer</label>
+              <span className="text-xs tabular-nums text-muted">{draft.length} / 2000</span>
+            </div>
               <textarea id="interview-answer" value={draft} onChange={(event) => onDraft(event.target.value)}
-                rows={2} maxLength={2000} disabled={!canAnswer} aria-describedby="interview-answer-hint"
+                rows={4} maxLength={2000} disabled={!canAnswer} aria-describedby="interview-answer-hint"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                     event.preventDefault();
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                className="field flex-1 resize-none"
+                className="field block min-h-[min(7rem,19dvh)] max-h-[28dvh] resize-none overflow-y-auto text-base leading-relaxed [field-sizing:content] sm:min-h-[min(9rem,20dvh)]"
                 placeholder={expired ? "The interview time has ended." : awaitingReply ? "Wait for the interviewer’s reply." : "Type your answer…"} />
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+            {canAnswer && <LiveCaptions interviewId={interviewId} onRecording={setRecording}
+              onWords={words => onDraft(previous => [previous.trimEnd(), words].filter(Boolean).join(" ").slice(0, 2000))} />}
+                <p id="interview-answer-hint" className="mt-1 hidden text-xs text-muted sm:block">Enter to send � Shift + Enter for a new line</p>
+              </div>
               <button disabled={!canAnswer || recording || !draft.trim()} className="action shrink-0">Send</button>
             </div>
-            <p id="interview-answer-hint" className="text-xs text-muted">Enter to send. Shift + Enter for a new line.</p>
           </form>
         )}
       </section>

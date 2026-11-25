@@ -75,3 +75,5 @@ Profile recovery: provider HTTP status is preserved on future failed builds. Use
 Interview planning now retries a Gemini 503 once after a short delay, using the existing model wrapper. Persistent service unavailability and provider quota errors are distinguished in API responses.
 
 Gemini can now use GEMINI_FALLBACK_MODEL on the existing single retry after a 503. The development fallback, gemini-3.5-flash-lite, returned a successful synthetic response. Usage events record the responding model.
+
+The interview answer editor now uses the full width, grows with the draft on supported browsers, and shows the character count. Dictation and Send are grouped beneath the draft.
