@@ -61,3 +61,5 @@ The signed-in account status endpoint returns the display name, remaining free i
 ## M2 voice
 
 A one-minute local microphone test is available at /voice-test with simulated captions and an on-device interviewer voice sample where supported. Live transcription accuracy and latency still need a provider-backed test.
+
+The voice test page now offers opt-in live captions using an authenticated temporary Deepgram token. Local Edge testing with a disposable account reached token issuance. Deepgram returned 403 FORBIDDEN for the configured key, so live microphone transcription is pending a key with Member permission.
