@@ -81,3 +81,5 @@ The interview answer editor now uses the full width, grows with the draft on sup
 The interview room now has a Live captions checkbox, enabled by default. It controls streaming interviewer text and interim dictation without interrupting recording, editing, or access to completed turns.
 
 The interview room can play the latest completed interviewer question with an on-device English voice. Playback and microphone capture are mutually exclusive. Deepgram Aura voice and audio format selection remain open.
+
+A disposable one-minute interview in Edge verified first-click playback, Stop playback, replay to completion, and microphone control locking. Device voice loading starts when the room mounts. The test used a prewritten question and no AI API calls.

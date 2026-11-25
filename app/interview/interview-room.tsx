@@ -43,10 +43,14 @@ export default function InterviewRoom({
   const canAnswer = !finished && !expired && !busy && !awaitingReply;
   const latestQuestion = [...turns].reverse().find(turn => turn.speaker === "interviewer")?.text;
 
-  useEffect(() => () => {
-    const playing = utterance.current;
-    utterance.current = null;
-    if (playing) window.speechSynthesis.cancel();
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    synth?.getVoices();
+    return () => {
+      const playing = utterance.current;
+      utterance.current = null;
+      if (playing) synth.cancel();
+    };
   }, []);
 
   function togglePlayback() {
