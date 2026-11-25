@@ -79,3 +79,5 @@ Gemini can now use GEMINI_FALLBACK_MODEL on the existing single retry after a 50
 The interview answer editor now uses the full width, grows with the draft on supported browsers, and shows the character count. Dictation and Send are grouped beneath the draft.
 
 The interview room now has a Live captions checkbox, enabled by default. It controls streaming interviewer text and interim dictation without interrupting recording, editing, or access to completed turns.
+
+The interview room can play the latest completed interviewer question with an on-device English voice. Playback and microphone capture are mutually exclusive. Deepgram Aura voice and audio format selection remain open.

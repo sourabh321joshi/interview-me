@@ -32,13 +32,61 @@ export default function InterviewRoom({
   error, draft, onDraft, onSend, onRetry, onEnd,
 }: Props) {
   const [recording, setRecording] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [playbackError, setPlaybackError] = useState("");
+  const utterance = useRef<SpeechSynthesisUtterance | null>(null);
   const [showCaptions, setShowCaptions] = useState(true);
   const visibleLive = showCaptions ? live : "";
   const transcript = useRef<HTMLOListElement>(null);
   const expired = remaining === 0;
   const busy = replying || ending;
   const canAnswer = !finished && !expired && !busy && !awaitingReply;
-  const status = finished ? "Interview complete" : expired ? "Time is up" : ending ? "Ending interview…" : replying
+  const latestQuestion = [...turns].reverse().find(turn => turn.speaker === "interviewer")?.text;
+
+  useEffect(() => () => {
+    const playing = utterance.current;
+    utterance.current = null;
+    if (playing) window.speechSynthesis.cancel();
+  }, []);
+
+  function togglePlayback() {
+    if (utterance.current) {
+      utterance.current = null;
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+    if (!latestQuestion || recording || !canAnswer) return;
+    const synth = window.speechSynthesis;
+    const voices = synth?.getVoices().filter(voice => voice.localService && /^en(?:-|$)/i.test(voice.lang)) ?? [];
+    const voice = voices.find(voice => voice.default) ?? voices[0];
+    if (!voice) {
+      setPlaybackError("No English device voice is available in this browser.");
+      return;
+    }
+
+    const speech = new SpeechSynthesisUtterance(latestQuestion);
+    speech.voice = voice;
+    speech.lang = voice.lang;
+    function complete(message = "") {
+      if (utterance.current !== speech) return;
+      utterance.current = null;
+      setSpeaking(false);
+      setPlaybackError(message);
+    }
+    speech.onend = () => complete();
+    speech.onerror = () => complete("Could not play the question. You can read it in the conversation.");
+    utterance.current = speech;
+    setPlaybackError("");
+    setSpeaking(true);
+    try {
+      synth.speak(speech);
+    } catch {
+      complete("Could not play the question. You can read it in the conversation.");
+    }
+  }
+
+  const status = speaking ? "Playing interviewer question..." : finished ? "Interview complete" : expired ? "Time is up" : ending ? "Ending interview…" : replying
     ? live ? "Interviewer is responding…" : "Interviewer is thinking…"
     : awaitingReply ? "Reply interrupted" : "Your turn";
 
@@ -64,7 +112,7 @@ export default function InterviewRoom({
           {finished ? (
             <Link href={`/report?interview=${interviewId}`} className="action text-sm">View feedback</Link>
           ) : (
-            <button type="button" onClick={() => void onEnd()} disabled={busy}
+            <button type="button" onClick={() => void onEnd()} disabled={busy || speaking}
               className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-muted hover:border-indigo-400 hover:text-white disabled:opacity-50">
               {ending ? "Ending…" : "End and get feedback"}
             </button>
@@ -76,6 +124,11 @@ export default function InterviewRoom({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-6">
           <h2 id="conversation-title" className="text-sm font-semibold">Conversation</h2>
           <div className="flex flex-wrap items-center gap-3">
+            {(speaking || (!finished && latestQuestion)) && <button type="button" onClick={togglePlayback}
+              disabled={!speaking && (recording || !canAnswer)}
+              className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold hover:border-indigo-400 disabled:opacity-50">
+              {speaking ? "Stop playback" : "Play question"}
+            </button>}
             <p role="status" className="text-sm text-muted">{status}</p>
             {!finished && <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input type="checkbox" checked={showCaptions} onChange={event => setShowCaptions(event.target.checked)}
@@ -106,6 +159,7 @@ export default function InterviewRoom({
           )}
           {!turns.length && !live && replying && <li className="text-sm text-muted">Waiting for your first question…</li>}
         </ol>
+        {playbackError && <p role="status" className="px-4 py-2 text-sm text-muted sm:px-6">{playbackError}</p>}
         {error && (
           <div role="alert" className="mx-4 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-200 sm:mx-6">
             <span>{error}</span>
@@ -115,7 +169,7 @@ export default function InterviewRoom({
           </div>
         )}
         {!finished && (
-          <form onSubmit={(event) => { event.preventDefault(); if (canAnswer && !recording) void onSend(); }}
+          <form onSubmit={(event) => { event.preventDefault(); if (canAnswer && !recording && !speaking) void onSend(); }}
             className="max-h-[60dvh] shrink-0 space-y-2 overflow-y-auto border-t border-line px-4 py-3 sm:px-6">
             <div className="flex items-baseline justify-between gap-3">
               <label htmlFor="interview-answer" className="text-base font-semibold">Your answer</label>
@@ -133,11 +187,11 @@ export default function InterviewRoom({
                 placeholder={expired ? "The interview time has ended." : awaitingReply ? "Wait for the interviewer’s reply." : "Type your answer…"} />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-            {canAnswer && <LiveCaptions interviewId={interviewId} showCaptions={showCaptions} onRecording={setRecording}
+            {canAnswer && <LiveCaptions disabled={speaking} interviewId={interviewId} showCaptions={showCaptions} onRecording={setRecording}
               onWords={words => onDraft(previous => [previous.trimEnd(), words].filter(Boolean).join(" ").slice(0, 2000))} />}
-                <p id="interview-answer-hint" className="mt-1 hidden text-xs text-muted sm:block">Enter to send � Shift + Enter for a new line</p>
+                <p id="interview-answer-hint" className="mt-1 hidden text-xs text-muted sm:block">Enter to send · Shift + Enter for a new line</p>
               </div>
-              <button disabled={!canAnswer || recording || !draft.trim()} className="action shrink-0">Send</button>
+              <button disabled={!canAnswer || recording || speaking || !draft.trim()} className="action shrink-0">Send</button>
             </div>
           </form>
         )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export default function LiveCaptions({ interviewId, onWords, onRecording, showCaptions = true }: { interviewId?: string; showCaptions?: boolean; onWords?: (words: string) => void; onRecording?: (active: boolean) => void }) {
+export default function LiveCaptions({ interviewId, onWords, onRecording, showCaptions = true, disabled = false }: { disabled?: boolean; interviewId?: string; showCaptions?: boolean; onWords?: (words: string) => void; onRecording?: (active: boolean) => void }) {
   const [active, setActive] = useState(false);
   const [status, setStatus] = useState("");
   const [caption, setCaption] = useState("");
@@ -11,7 +11,7 @@ export default function LiveCaptions({ interviewId, onWords, onRecording, showCa
   useEffect(() => () => cancel.current?.(), []);
 
   async function start() {
-    if (cancel.current) return;
+    if (disabled || cancel.current) return;
     let closed = false;
     let stopping = false;
     let finalText = "";
@@ -114,9 +114,9 @@ export default function LiveCaptions({ interviewId, onWords, onRecording, showCa
     }
   }
   if (interviewId) return <div className="space-y-1 text-sm">
-    <button type="button" className="rounded-lg border border-line px-3 py-1 font-semibold" onClick={active ? () => finish.current?.() : start}>{active ? "Finish dictation" : "Dictate answer"}</button>
+    <button type="button" className="rounded-lg border border-line px-3 py-1 font-semibold disabled:opacity-50" disabled={disabled} onClick={active ? () => finish.current?.() : start}>{active ? "Finish dictation" : "Dictate answer"}</button>
     <p className="text-xs text-muted">Dictation shares audio and profile skill terms with Deepgram.</p>
-    <p role="status" className="max-h-16 overflow-y-auto break-words text-sm text-indigo-200">{status}{active && showCaptions && caption ? " · " + caption : ""}</p>
+    <p role="status" className="max-h-16 overflow-y-auto break-words text-sm text-indigo-200">{status}{active && showCaptions && caption ? " Â· " + caption : ""}</p>
   </div>;
   return <section className="surface space-y-4 p-5">
     <h2 className="font-semibold">Live captions</h2>
