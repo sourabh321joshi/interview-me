@@ -19,6 +19,28 @@ describe("MarkerStripper", () => {
 });
 
 describe("turns", () => {
+  it("saves Standard interview code with formatting and supplies it as data on retry", async () => {
+    const { id, deps, interviews, calls } = await startedInterview([["Write a sum function."], [new Error("interrupted")], ["Why use reduce?"]], 600);
+    await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps));
+    const code = "function sum(values) {\n  return values.reduce((a, b) => a + b, 0);\n}\n";
+    const request = { client_turn_id: uid(), type: "code", code };
+    await expect(collect(await prepareTurn("u1", id, request, deps))).rejects.toThrow("interrupted");
+    expect(interviews.docs.get(id)!.turns[1]).toMatchObject({ kind: "code", text: code });
+    expect(text(await collect(await prepareTurn("u1", id, request, deps)))).toBe("Why use reduce?");
+    expect(calls[2].messages.at(-1)?.content).toContain('<data label="candidate_code">\n' + code);
+    expect(interviews.docs.get(id)!.turns.filter(turn => turn.kind === "code")).toHaveLength(1);
+  });
+
+  it("rejects code submissions in a Quick interview and invalid source in Standard", async () => {
+    const quick = await startedInterview([["Hello."]]);
+    const standard = await startedInterview([["Hello."]], 600);
+    const request = { client_turn_id: uid(), type: "code", code: "return 1;" };
+    await expect(prepareTurn("u1", quick.id, request, quick.deps)).rejects.toMatchObject({ code: "validation_failed" });
+    for (const code of ["  ", "x".repeat(2001)]) {
+      await expect(prepareTurn("u1", standard.id, { ...request, code }, standard.deps)).rejects.toMatchObject({ code: "validation_failed" });
+    }
+  });
+
   it("opens the interview with the plan and profile in the fixed prefix", async () => {
     const { id, deps, interviews, calls } = await startedInterview([["Hi Riya, ", "tell me about TaskFlow."]]);
     const p = await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps);

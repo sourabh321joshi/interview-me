@@ -12,7 +12,9 @@ import { useEffect, useRef, useState } from "react";
 
 type VoiceClip = { seq: number; text: string; proof: string };
 
-type TurnRequest = { type: "open" | "answer"; client_turn_id: string; text?: string };
+type TurnRequest = { client_turn_id: string } & (
+  { type: "open" } | { type: "answer"; text: string } | { type: "code"; code: string }
+);
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong.");
 
@@ -77,6 +79,7 @@ export default function InterviewPage() {
   const [endsAt, setEndsAt] = useState<number | null>(null);
   const [offset, setOffset] = useState(0);
   const [now, setNow] = useState(0);
+  const [standard, setStandard] = useState(false);
   const [draft, setDraft] = useState("");
   const [ending, setEnding] = useState(false);
   const plannedInterview = useRef<{ id: string; settings: string } | null>(null);
@@ -154,7 +157,8 @@ export default function InterviewPage() {
     const v = await api(`/api/v1/interviews/${id}`);
     setInterviewId(id);
     setVoiceMode(v.mode === "voice");
-    setTurns(v.turns.map((t: RoomTurn) => ({ speaker: t.speaker, text: t.text, seq: t.seq })));
+    setStandard(v.duration_seconds === 600);
+    setTurns(v.turns.map((t: RoomTurn) => ({ speaker: t.speaker, text: t.text, seq: t.seq, kind: t.kind })));
     setEndsAt(v.ends_at ? new Date(v.ends_at).getTime() : null);
     const receivedAt = Date.now();
     setNow(receivedAt);
@@ -166,7 +170,9 @@ export default function InterviewPage() {
     if (over || v.status === "plan_ready") return;
     if (!last) await runTurn(id, { type: "open", client_turn_id: crypto.randomUUID() });
     else if (last.speaker === "candidate" && last.client_turn_id) {
-      setPending({ type: "answer", client_turn_id: last.client_turn_id, text: last.text });
+      setPending(last.kind === "code"
+        ? { type: "code", client_turn_id: last.client_turn_id, code: last.text }
+        : { type: "answer", client_turn_id: last.client_turn_id, text: last.text });
       setError("Your last answer is saved. Retry to recover the reply.");
     }
   }
@@ -247,6 +253,7 @@ export default function InterviewPage() {
       plannedInterview.current = null;
       window.history.replaceState(null, "", `?interview=${iv.id}`);
       setVoiceMode(!!form.get("luna"));
+      setStandard(Number(form.get("duration")) === 600);
       setInterviewId(iv.id);
       setEndsAt(new Date(started.ends_at).getTime());
       const receivedAt = Date.now();
@@ -266,6 +273,12 @@ export default function InterviewPage() {
     setDraft("");
     setTurns((t) => [...t, { speaker: "candidate", text }]);
     await runTurn(interviewId, { type: "answer", text, client_turn_id: crypto.randomUUID() });
+  }
+
+  async function sendCode(code: string) {
+    if (!standard || !code.trim() || code.length > 2000 || busy || pending || ending || finished || timeUp) return;
+    setTurns(turns => [...turns, { speaker: "candidate", kind: "code", text: code }]);
+    await runTurn(interviewId, { type: "code", code, client_turn_id: crypto.randomUUID() });
   }
 
   async function endNow() {
@@ -324,6 +337,7 @@ export default function InterviewPage() {
       draft={draft}
       onDraft={setDraft}
       onSend={send}
+      onSendCode={standard ? sendCode : undefined}
       onRetry={() => { if (pending && !busy && !ending && !finished && !timeUp) void runTurn(interviewId, pending); }}
       onEnd={endNow}
     />

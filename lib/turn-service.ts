@@ -18,8 +18,9 @@ function isPastDeadline(now: Date, endsAt: Date, duration: number) {
 
 export const TurnBodySchema = z.object({
   client_turn_id: z.uuid(),
-  type: z.enum(["open", "answer", "silence"]),
+  type: z.enum(["open", "answer", "silence", "code"]),
   text: z.string().trim().max(2000).optional(),
+  code: z.string().max(2000).refine(code => !!code.trim()).optional(),
 });
 
 // Removes the end marker from streamed text, even when it arrives split across chunks.
@@ -101,10 +102,18 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
   const parsed = TurnBodySchema.safeParse(raw);
   if (!parsed.success) throw new DomainError("validation_failed", "Invalid turn request.");
   const body = parsed.data;
-  if (body.type === "answer" ? !body.text : !!body.text) throw new DomainError("validation_failed", body.type === "answer" ? "Answer text is required." : "This turn type takes no text.");
+  if ((body.type === "answer") !== !!body.text) {
+    throw new DomainError("validation_failed", body.type === "answer" ? "Answer text is required." : "This turn type takes no text.");
+  }
+  if ((body.type === "code") !== !!body.code) {
+    throw new DomainError("validation_failed", body.type === "code" ? "JavaScript source is required." : "This turn type takes no code.");
+  }
 
   const iv = await deps.interviews.findOwned(userId, id);
   if (!iv) throw new DomainError("not_found", "Interview not found.");
+  if (body.type === "code" && iv.duration_seconds !== 600) {
+    throw new DomainError("validation_failed", "Code submissions require a Standard interview.");
+  }
   const now = deps.now?.() ?? new Date();
   const remaining = Math.max(0, Math.ceil(((iv.ends_at?.getTime() ?? 0) - now.getTime()) / 1000));
   const replay = (t: Turn): Prepared => ({ kind: "replay", end: { seq: t.seq, text: hideElapsed(t.text), is_final: iv.status === "completed" && t.seq === iv.turn_count - 1, remaining_seconds: remaining } });
@@ -134,8 +143,8 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
   let turns = iv.turns;
   if (body.type !== "open" && !existing) {
     const candidate: Turn = {
-      seq: iv.turn_count, speaker: "candidate", kind: body.type === "answer" ? "text" : "system",
-      text: body.type === "answer" ? body.text! : "(silence)", t_offset_ms: elapsedMs, client_turn_id: body.client_turn_id, created_at: now,
+      seq: iv.turn_count, speaker: "candidate", kind: body.type === "answer" ? "text" : body.type === "code" ? "code" : "system",
+      text: body.code ?? (body.type === "answer" ? body.text! : "(silence)"), t_offset_ms: elapsedMs, client_turn_id: body.client_turn_id, created_at: now,
     };
     if (!(await deps.interviews.appendTurn(userId, id, iv.turn_count, candidate, body.client_turn_id))) {
       throw new DomainError("interview_not_active", "Another request is already in progress for this interview.");
@@ -182,11 +191,14 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
   }, iv.prompt_version === "0.1" ? "0.1" : INTERVIEWER_PROMPT_VERSION) + "\n\nINTERVIEW PLAN (data from the planner)\n" + wrapData("interview_plan", JSON.stringify(plan));
 
   const tag = (ms: number) => `[elapsed: ${fmt(ms)} of ${fmt(iv.duration_seconds * 1000)}]`;
+  const interviewSystem = iv.duration_seconds === 600
+    ? system + "\n\n" + loadPrompt("interviewer-coding")
+    : system;
   const messages: Message[] = [{ role: "user", content: `${tag(0)} (The interview is starting. Greet the candidate and ask your first question.)` }];
   for (const t of turns) {
     messages.push(t.speaker === "interviewer"
       ? { role: "assistant", content: hideElapsed(t.text) }
-      : { role: "user", content: `${tag(t.t_offset_ms)} ${t.kind === "system" ? "(The candidate has been silent for a while.)" : t.text}` });
+      : { role: "user", content: `${tag(t.t_offset_ms)} ${t.kind === "system" ? "(The candidate has been silent for a while.)" : t.kind === "code" ? wrapData("candidate_code", t.text) : t.text}` });
   }
   if (wrap) messages[messages.length - 1].content += `\n[server note: about ${wrapSeconds} seconds remain. Give your closing message now, then add the end marker line.]`;
 
@@ -200,7 +212,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
     const chunks = wantsToEnd
       ? [`Thanks for practicing. Your interview is complete.
 ${MARKER}`]
-      : deps.llm.streamTurn({ system, messages, ctx: { user_id: userId, interview_id: id } });
+      : deps.llm.streamTurn({ system: interviewSystem, messages, ctx: { user_id: userId, interview_id: id } });
     let text = "";
     for await (const d of chunks) {
       const out = elapsed.push(strip.push(d));

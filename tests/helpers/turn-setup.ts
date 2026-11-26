@@ -24,7 +24,7 @@ export function fakeTurnLlm(script: Array<Array<string | Error>>) {
   return { llm, calls };
 }
 
-export async function startedInterview(script: Array<Array<string | Error>>) {
+export async function startedInterview(script: Array<Array<string | Error>>, duration = 300) {
   const profiles = memoryStore();
   const pid = await profiles.insert({ user_id: "u1", github_username: null, job_description: null });
   await profiles.markReady("u1", pid, { summary: SUMMARY as unknown as ProfileSummary, github_summary: null });
@@ -32,7 +32,7 @@ export async function startedInterview(script: Array<Array<string | Error>>) {
   const clock = { t: T0 };
   const now = () => clock.t;
   const base = { interviews, users: memoryUsers(), profiles, llm: fakeLlm([PLAN]).llm, models: () => ({ plan: "m", turn: "m", report: "m" }), freeLimit: 5, now };
-  const { id } = await createInterview("u1", { profile_id: pid, role: "frontend", level: "fresher", duration_seconds: 300 }, base);
+  const { id } = await createInterview("u1", { profile_id: pid, role: "frontend", level: "fresher", duration_seconds: duration }, base);
   const started = await startInterview("u1", id, base);
   const turnLlm = fakeTurnLlm(script);
   const deps: TurnDeps = { interviews, profiles, llm: turnLlm.llm, now };

@@ -91,3 +91,5 @@ Interview setup offers opt-in automatic Luna playback of completed interviewer q
 Automated tests verified that Luna requests sentences in order and releases dictation after the last simulated audio clip. End-to-end audible interview playback remains unverified.
 
 Luna now queues authorized sentences as reply text streams. The one-minute simulated test verifies that the first sentence is available before the next text chunk. Browser performance records the time from requesting a turn to starting its first audio clip as interview-first-audio.
+
+The 10-minute Standard interview offers a lazy-loaded Monaco JavaScript editor. It saves source as a code turn and restores interrupted code submissions on refresh. Code execution and output capture are planned separately.

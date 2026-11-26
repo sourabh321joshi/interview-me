@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "better-auth": "1.7.27",
+    "monaco-editor": "0.55.1",
     "mongodb": "^7.9.0",
     "next": "16.4.6",
     "openai": "^7.57.0",

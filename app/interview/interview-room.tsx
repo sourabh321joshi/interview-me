@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import CodeEditor from "./code-editor";
 import LunaQuestion from "./luna-question";
 import LiveCaptions from "../voice-test/live-captions";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
-export type RoomTurn = { seq?: number; speaker: "interviewer" | "candidate"; text: string };
+export type RoomTurn = { seq?: number; speaker: "interviewer" | "candidate"; kind?: string; text: string };
 
 type Props = {
   voiceMode: boolean;
@@ -25,6 +26,7 @@ type Props = {
   draft: string;
   onDraft: Dispatch<SetStateAction<string>>;
   onSend: () => Promise<void>;
+  onSendCode?: (code: string) => Promise<void>;
   onRetry: () => void;
   onEnd: () => Promise<void>;
 };
@@ -35,8 +37,10 @@ function clock(seconds: number) {
 
 export default function InterviewRoom({
   voiceMode, streamedVoiceSeq, streamingAudio, voiceError, onStopStreamingAudio, interviewId, turns, live, remaining, finished, replying, awaitingReply, ending,
-  error, draft, onDraft, onSend, onRetry, onEnd,
+  error, draft, onDraft, onSend, onSendCode, onRetry, onEnd,
 }: Props) {
+  const [editingCode, setEditingCode] = useState(false);
+  const [code, setCode] = useState("");
   const [recording, setRecording] = useState(false);
   const [completedAudio, setCompletedAudio] = useState(false);
   const lunaPlaying = completedAudio || streamingAudio;
@@ -51,6 +55,7 @@ export default function InterviewRoom({
   const expired = remaining === 0;
   const busy = replying || ending;
   const canAnswer = !finished && !expired && !busy && !awaitingReply;
+  const canSubmit = canAnswer && !recording && !speaking && !lunaPlaying;
   const latestQuestion = [...turns].reverse().find(turn => turn.speaker === "interviewer")?.text;
 
   useEffect(() => {
@@ -163,7 +168,7 @@ export default function InterviewRoom({
                   {turn.speaker === "candidate" ? "You" : "Interviewer"}
                 </p>
                 <p className={`whitespace-pre-wrap break-words rounded-xl border px-3.5 py-2.5 text-sm leading-relaxed sm:text-base ${turn.speaker === "candidate" ? "border-indigo-400/30 bg-indigo-500/15" : "border-line bg-background"}`}>
-                  {turn.text}
+                  {turn.kind === "code" ? <code className="block whitespace-pre-wrap font-mono">{turn.text}</code> : turn.text}
                 </p>
               </div>
             </li>
@@ -186,8 +191,23 @@ export default function InterviewRoom({
           </div>
         )}
         {!finished && (
-          <form onSubmit={(event) => { event.preventDefault(); if (canAnswer && !recording && !speaking && !lunaPlaying) void onSend(); }}
-            className="max-h-[60dvh] shrink-0 space-y-2 overflow-y-auto border-t border-line px-4 py-3 sm:px-6">
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            if (!canSubmit) return;
+            if (editingCode) void onSendCode?.(code);
+            else void onSend();
+          }} className="max-h-[60dvh] shrink-0 space-y-2 overflow-y-auto border-t border-line px-4 py-3 sm:px-6">
+            {onSendCode && <button type="button" aria-pressed={editingCode} disabled={recording}
+              className="text-sm font-semibold text-indigo-300 underline disabled:opacity-50"
+              onClick={() => setEditingCode(!editingCode)}>JavaScript editor</button>}
+            {editingCode ? <>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold">JavaScript</span>
+                <span className={code.length > 2000 ? "text-xs text-red-300" : "text-xs text-muted"}>{code.length} / 2000</span>
+              </div>
+              <CodeEditor value={code} onChange={setCode} disabled={!canAnswer} />
+              <button className="action" disabled={!canSubmit || !code.trim() || code.length > 2000}>Submit code</button>
+            </> : <>
             <div className="flex items-baseline justify-between gap-3">
               <label htmlFor="interview-answer" className="text-base font-semibold">Your answer</label>
               <span className="text-xs tabular-nums text-muted">{draft.length} / 2000</span>
@@ -208,8 +228,9 @@ export default function InterviewRoom({
               onWords={words => onDraft(previous => [previous.trimEnd(), words].filter(Boolean).join(" ").slice(0, 2000))} />}
                 <p id="interview-answer-hint" className="mt-1 hidden text-xs text-muted sm:block">Enter to send · Shift + Enter for a new line</p>
               </div>
-              <button disabled={!canAnswer || recording || speaking || lunaPlaying || !draft.trim()} className="action shrink-0">Send</button>
+              <button disabled={!canSubmit || !draft.trim()} className="action shrink-0">Send</button>
             </div>
+            </>}
           </form>
         )}
       </section>
