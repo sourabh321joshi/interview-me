@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUserId } from "@/lib/auth";
 import { HistoryQuery, listInterviewHistory } from "@/lib/history";
 import { DIMENSIONS, type Dimension } from "@/lib/report-schema";
+import { historyTrendRows } from "@/lib/history-trend";
+import ScoreTrend from "./score-trend";
 import SignOut from "../sign-in/sign-out";
 
 type Props = { searchParams: Promise<{ cursor?: string }> };
@@ -21,6 +23,7 @@ async function History({ searchParams }: Props) {
   const query = HistoryQuery.safeParse(await searchParams);
   if (!query.success) redirect("/history");
   const { items, next_cursor } = await listInterviewHistory(userId, query.data);
+  const trendRows = historyTrendRows(items);
 
   return <>
     <SignOut />
@@ -30,6 +33,7 @@ async function History({ searchParams }: Props) {
         <Link className="action" href="/interview">Start practice</Link>
       </div>
       {items.length === 0 && <p className="surface mt-6 p-5 text-muted">{query.data.cursor ? "No older interviews to show." : "Your practice interviews will appear here."}</p>}
+      {trendRows.length > 0 && <ScoreTrend rows={trendRows} dimensions={dimensions} roles={roles} />}
       <ul className="mt-6 grid gap-3">
         {items.map(item => <li key={item.id} className="surface p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">

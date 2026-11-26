@@ -101,3 +101,5 @@ An isolated local Chrome test verified console output, async return values, runt
 Standard interviews use a shared JavaScript challenge, Sum the even numbers. The editor runs three visible cases in isolated workers and shows expected and actual results. Submission includes results from the current source as candidate-reported output.
 
 Reports now include code-quality feedback when the candidate submitted source. The existing report request reviews the latest submission and its candidate-reported test output, validates the cited code excerpt, and suggests an edge case to practice.
+
+History now charts the four rubric dimensions for reports on the current page, oldest to newest. It shows change from the previous scored attempt and links each selected interview to its report. The chart uses the existing signed-in history query.
