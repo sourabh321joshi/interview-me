@@ -8,6 +8,7 @@ export type SlotSource = "free" | "paid";
 export type EndReason = "model_finished" | "user_ended" | "timeout" | "error";
 export type Turn = {
   seq: number; speaker: "interviewer" | "candidate"; kind: "speech" | "text" | "code" | "system"; text: string;
+  output?: string;
   t_offset_ms: number; client_turn_id: string | null; created_at: Date;
 };
 export type InterviewDoc = {

@@ -190,7 +190,7 @@ Request:
 | `open` | Ask for the opening question; send once after start | not allowed |
 | `answer` | Candidate’s spoken or typed answer | required, up to 2,000 characters |
 | `silence` | Candidate has been silent; AI offers help | not allowed |
-| `code` | Candidate JavaScript source in a 10-minute Standard interview | Use the `code` field, up to 2,000 characters |
+| `code` | Candidate JavaScript source in a 10-minute Standard interview | Use the `code` field and optional `output`, each up to 2,000 characters |
 
 Response: `200` with `Content-Type: text/event-stream`.
 

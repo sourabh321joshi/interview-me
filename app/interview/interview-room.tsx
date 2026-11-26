@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { runJavaScript } from "./run-javascript";
 import CodeEditor from "./code-editor";
 import LunaQuestion from "./luna-question";
 import LiveCaptions from "../voice-test/live-captions";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
-export type RoomTurn = { seq?: number; speaker: "interviewer" | "candidate"; kind?: string; text: string };
+export type RoomTurn = { seq?: number; speaker: "interviewer" | "candidate"; kind?: string; output?: string; text: string };
 
 type Props = {
   voiceMode: boolean;
@@ -26,7 +27,7 @@ type Props = {
   draft: string;
   onDraft: Dispatch<SetStateAction<string>>;
   onSend: () => Promise<void>;
-  onSendCode?: (code: string) => Promise<void>;
+  onSendCode?: (code: string, output?: string) => Promise<void>;
   onRetry: () => void;
   onEnd: () => Promise<void>;
 };
@@ -41,6 +42,28 @@ export default function InterviewRoom({
 }: Props) {
   const [editingCode, setEditingCode] = useState(false);
   const [code, setCode] = useState("");
+  const [runningCode, setRunningCode] = useState(false);
+  const [codeResult, setCodeResult] = useState<{ source: string; output: string }>();
+  const codeRun = useRef<AbortController | null>(null);
+  useEffect(() => () => codeRun.current?.abort(), []);
+  const output = codeResult?.source === code ? codeResult.output : undefined;
+
+  async function runCode() {
+    if (codeRun.current) return;
+    const controller = new AbortController();
+    codeRun.current = controller;
+    setRunningCode(true);
+    setCodeResult(undefined);
+    try {
+      const result = await runJavaScript(code, controller.signal);
+      setCodeResult({ source: code, output: result });
+    } catch {
+      if (!controller.signal.aborted) setCodeResult({ source: code, output: "The JavaScript runner could not start." });
+    } finally {
+      codeRun.current = null;
+      if (!controller.signal.aborted) setRunningCode(false);
+    }
+  }
   const [recording, setRecording] = useState(false);
   const [completedAudio, setCompletedAudio] = useState(false);
   const lunaPlaying = completedAudio || streamingAudio;
@@ -168,7 +191,10 @@ export default function InterviewRoom({
                   {turn.speaker === "candidate" ? "You" : "Interviewer"}
                 </p>
                 <p className={`whitespace-pre-wrap break-words rounded-xl border px-3.5 py-2.5 text-sm leading-relaxed sm:text-base ${turn.speaker === "candidate" ? "border-indigo-400/30 bg-indigo-500/15" : "border-line bg-background"}`}>
-                  {turn.kind === "code" ? <code className="block whitespace-pre-wrap font-mono">{turn.text}</code> : turn.text}
+                  {turn.kind === "code" ? <>
+                    <code className="block whitespace-pre-wrap font-mono">{turn.text}</code>
+                    {turn.output && <code className="mt-2 block border-t border-line pt-2 font-mono text-muted">{turn.output}</code>}
+                  </> : turn.text}
                 </p>
               </div>
             </li>
@@ -194,8 +220,8 @@ export default function InterviewRoom({
           <form onSubmit={(event) => {
             event.preventDefault();
             if (!canSubmit) return;
-            if (editingCode) void onSendCode?.(code);
-            else void onSend();
+            if (editingCode && !runningCode) void onSendCode?.(code, output);
+            else if (!editingCode) void onSend();
           }} className="max-h-[60dvh] shrink-0 space-y-2 overflow-y-auto border-t border-line px-4 py-3 sm:px-6">
             {onSendCode && <button type="button" aria-pressed={editingCode} disabled={recording}
               className="text-sm font-semibold text-indigo-300 underline disabled:opacity-50"
@@ -206,7 +232,17 @@ export default function InterviewRoom({
                 <span className={code.length > 2000 ? "text-xs text-red-300" : "text-xs text-muted"}>{code.length} / 2000</span>
               </div>
               <CodeEditor value={code} onChange={setCode} disabled={!canAnswer} />
-              <button className="action" disabled={!canSubmit || !code.trim() || code.length > 2000}>Submit code</button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                  disabled={!canAnswer || runningCode || !code.trim() || code.length > 2000} onClick={() => void runCode()}>
+                  {runningCode ? "Running..." : "Run code"}
+                </button>
+                <button className="action" disabled={!canSubmit || runningCode || !code.trim() || code.length > 2000}>Submit code</button>
+              </div>
+              {output !== undefined && <section aria-label="Code output" className="rounded-lg border border-line bg-background p-3">
+                <h3 className="text-sm font-semibold">Output</h3>
+                <pre role="status" className="mt-1 max-h-36 overflow-auto whitespace-pre-wrap break-words text-sm">{output}</pre>
+              </section>}
             </> : <>
             <div className="flex items-baseline justify-between gap-3">
               <label htmlFor="interview-answer" className="text-base font-semibold">Your answer</label>

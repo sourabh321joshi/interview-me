@@ -23,11 +23,14 @@ describe("turns", () => {
     const { id, deps, interviews, calls } = await startedInterview([["Write a sum function."], [new Error("interrupted")], ["Why use reduce?"]], 600);
     await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps));
     const code = "function sum(values) {\n  return values.reduce((a, b) => a + b, 0);\n}\n";
-    const request = { client_turn_id: uid(), type: "code", code };
+    const output = "42\n";
+    const request = { client_turn_id: uid(), type: "code", code, output };
     await expect(collect(await prepareTurn("u1", id, request, deps))).rejects.toThrow("interrupted");
-    expect(interviews.docs.get(id)!.turns[1]).toMatchObject({ kind: "code", text: code });
+    expect(interviews.docs.get(id)!.turns[1]).toMatchObject({ kind: "code", text: code, output });
+    expect((await getInterviewView("u1", id, deps)).turns[1].output).toBe(output);
     expect(text(await collect(await prepareTurn("u1", id, request, deps)))).toBe("Why use reduce?");
     expect(calls[2].messages.at(-1)?.content).toContain('<data label="candidate_code">\n' + code);
+    expect(calls[2].messages.at(-1)?.content).toContain('<data label="candidate_output">\n' + output);
     expect(interviews.docs.get(id)!.turns.filter(turn => turn.kind === "code")).toHaveLength(1);
   });
 

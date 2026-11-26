@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 type VoiceClip = { seq: number; text: string; proof: string };
 
 type TurnRequest = { client_turn_id: string } & (
-  { type: "open" } | { type: "answer"; text: string } | { type: "code"; code: string }
+  { type: "open" } | { type: "answer"; text: string } | { type: "code"; code: string; output?: string }
 );
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong.");
@@ -158,7 +158,7 @@ export default function InterviewPage() {
     setInterviewId(id);
     setVoiceMode(v.mode === "voice");
     setStandard(v.duration_seconds === 600);
-    setTurns(v.turns.map((t: RoomTurn) => ({ speaker: t.speaker, text: t.text, seq: t.seq, kind: t.kind })));
+    setTurns(v.turns.map((t: RoomTurn) => ({ speaker: t.speaker, text: t.text, seq: t.seq, kind: t.kind, output: t.output })));
     setEndsAt(v.ends_at ? new Date(v.ends_at).getTime() : null);
     const receivedAt = Date.now();
     setNow(receivedAt);
@@ -171,7 +171,7 @@ export default function InterviewPage() {
     if (!last) await runTurn(id, { type: "open", client_turn_id: crypto.randomUUID() });
     else if (last.speaker === "candidate" && last.client_turn_id) {
       setPending(last.kind === "code"
-        ? { type: "code", client_turn_id: last.client_turn_id, code: last.text }
+        ? { type: "code", client_turn_id: last.client_turn_id, code: last.text, output: last.output }
         : { type: "answer", client_turn_id: last.client_turn_id, text: last.text });
       setError("Your last answer is saved. Retry to recover the reply.");
     }
@@ -275,10 +275,10 @@ export default function InterviewPage() {
     await runTurn(interviewId, { type: "answer", text, client_turn_id: crypto.randomUUID() });
   }
 
-  async function sendCode(code: string) {
+  async function sendCode(code: string, output?: string) {
     if (!standard || !code.trim() || code.length > 2000 || busy || pending || ending || finished || timeUp) return;
-    setTurns(turns => [...turns, { speaker: "candidate", kind: "code", text: code }]);
-    await runTurn(interviewId, { type: "code", code, client_turn_id: crypto.randomUUID() });
+    setTurns(turns => [...turns, { speaker: "candidate", kind: "code", text: code, output }]);
+    await runTurn(interviewId, { type: "code", code, output, client_turn_id: crypto.randomUUID() });
   }
 
   async function endNow() {

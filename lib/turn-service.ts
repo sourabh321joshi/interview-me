@@ -21,6 +21,7 @@ export const TurnBodySchema = z.object({
   type: z.enum(["open", "answer", "silence", "code"]),
   text: z.string().trim().max(2000).optional(),
   code: z.string().max(2000).refine(code => !!code.trim()).optional(),
+  output: z.string().max(2000).optional(),
 });
 
 // Removes the end marker from streamed text, even when it arrives split across chunks.
@@ -105,7 +106,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
   if ((body.type === "answer") !== !!body.text) {
     throw new DomainError("validation_failed", body.type === "answer" ? "Answer text is required." : "This turn type takes no text.");
   }
-  if ((body.type === "code") !== !!body.code) {
+  if ((body.type === "code") !== !!body.code || (body.type !== "code" && body.output !== undefined)) {
     throw new DomainError("validation_failed", body.type === "code" ? "JavaScript source is required." : "This turn type takes no code.");
   }
 
@@ -144,6 +145,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
   if (body.type !== "open" && !existing) {
     const candidate: Turn = {
       seq: iv.turn_count, speaker: "candidate", kind: body.type === "answer" ? "text" : body.type === "code" ? "code" : "system",
+      ...(body.type === "code" && body.output ? { output: body.output } : {}),
       text: body.code ?? (body.type === "answer" ? body.text! : "(silence)"), t_offset_ms: elapsedMs, client_turn_id: body.client_turn_id, created_at: now,
     };
     if (!(await deps.interviews.appendTurn(userId, id, iv.turn_count, candidate, body.client_turn_id))) {
@@ -196,9 +198,12 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
     : system;
   const messages: Message[] = [{ role: "user", content: `${tag(0)} (The interview is starting. Greet the candidate and ask your first question.)` }];
   for (const t of turns) {
+    const candidateContent = t.kind === "system" ? "(The candidate has been silent for a while.)"
+      : t.kind === "code" ? [wrapData("candidate_code", t.text), t.output && wrapData("candidate_output", t.output)].filter(Boolean).join("\n")
+      : t.text;
     messages.push(t.speaker === "interviewer"
       ? { role: "assistant", content: hideElapsed(t.text) }
-      : { role: "user", content: `${tag(t.t_offset_ms)} ${t.kind === "system" ? "(The candidate has been silent for a while.)" : t.kind === "code" ? wrapData("candidate_code", t.text) : t.text}` });
+      : { role: "user", content: `${tag(t.t_offset_ms)} ${candidateContent}` });
   }
   if (wrap) messages[messages.length - 1].content += `\n[server note: about ${wrapSeconds} seconds remain. Give your closing message now, then add the end marker line.]`;
 
@@ -245,7 +250,7 @@ export async function getInterviewView(userId: string, id: string, deps: Pick<Tu
     id: iv.id, status: iv.status, role: iv.role, level: iv.level, mode: iv.mode, duration_seconds: iv.duration_seconds,
     started_at: iv.started_at, ends_at: iv.ends_at, expire_at: iv.expire_at ?? null, server_now: now.toISOString(),
     remaining_seconds: iv.ends_at ? Math.max(0, Math.ceil((iv.ends_at.getTime() - now.getTime()) / 1000)) : null,
-    turns: iv.turns.map((t) => ({ seq: t.seq, speaker: t.speaker, kind: t.kind, text: t.speaker === "interviewer" ? hideElapsed(t.text) : t.text, t_offset_ms: t.t_offset_ms, client_turn_id: t.speaker === "candidate" ? t.client_turn_id : null })),
+    turns: iv.turns.map((t) => ({ seq: t.seq, speaker: t.speaker, kind: t.kind, ...(t.kind === "code" && t.output ? { output: t.output } : {}), text: t.speaker === "interviewer" ? hideElapsed(t.text) : t.text, t_offset_ms: t.t_offset_ms, client_turn_id: t.speaker === "candidate" ? t.client_turn_id : null })),
   };
 }
 

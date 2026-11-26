@@ -93,3 +93,7 @@ Automated tests verified that Luna requests sentences in order and releases dict
 Luna now queues authorized sentences as reply text streams. The one-minute simulated test verifies that the first sentence is available before the next text chunk. Browser performance records the time from requesting a turn to starting its first audio clip as interview-first-audio.
 
 The 10-minute Standard interview offers a lazy-loaded Monaco JavaScript editor. It saves source as a code turn and restores interrupted code submissions on refresh. Code execution and output capture are planned separately.
+
+Standard interview candidates can run their JavaScript in a worker inside a sandboxed frame. A run stops after two seconds and its output accompanies submission only when it matches the current source.
+
+An isolated local Chrome test verified console output, async return values, runtime errors, loop timeout, and blocked network access. A simulated interview verified output persistence and retry.
