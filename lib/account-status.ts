@@ -7,6 +7,8 @@ type AccountRecord = {
   display_name?: string | null;
   free_interviews_used?: number;
   paid_interview_credits?: number;
+  smoke_interviews_used?: number;
+  paid_duration_credits?: Record<string, number>;
 };
 
 export async function getAccountStatus(user: { id: string; name: string }) {
@@ -22,7 +24,10 @@ export async function getAccountStatus(user: { id: string; name: string }) {
   return {
     id: user.id,
     display_name: record?.display_name ?? user.name,
-    ...interviewAllowance(freeInterviewLimit(), record),
+    ...interviewAllowance(1, record),
+    ...(process.env.NODE_ENV === "development" ? {
+      smoke_interviews_remaining: Math.max(0, freeInterviewLimit() - (record?.smoke_interviews_used ?? 0)),
+    } : {}),
     consent: { required_version: version, accepted_version: accepted ? version : null },
   };
 }

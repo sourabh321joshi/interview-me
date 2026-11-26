@@ -21,7 +21,7 @@ it("returns fresh-account defaults for the verified session", async () => {
   vi.stubEnv("FREE_INTERVIEW_LIMIT", "2");
   findOne.mockResolvedValue(null);
   expect(await (await request()).json()).toEqual({
-    id: "owner", display_name: "Riya", free_interviews_remaining: 2, paid_credits: 0,
+    id: "owner", display_name: "Riya", free_interviews_remaining: 1, paid_credits: 0,
     consent: { required_version: consentPolicy().version, accepted_version: null },
   });
   expect(findOne).toHaveBeenCalledWith({ _id: "owner" });

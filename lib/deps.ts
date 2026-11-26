@@ -10,6 +10,7 @@ export function interviewDeps(): InterviewDeps {
   return {
     interviews: createMongoInterviewsStore(), users: createMongoUsersStore(), profiles: createMongoProfilesStore(), llm: getLlm(),
     models: () => ({ plan: getModel("plan"), turn: getModel("turn"), report: getModel("report") }),
+    durationPricing: true,
     freeLimit: freeInterviewLimit(),
   };
 }

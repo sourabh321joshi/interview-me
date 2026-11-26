@@ -105,3 +105,5 @@ Reports now include code-quality feedback when the candidate submitted source. T
 History now charts the four rubric dimensions for reports on the current page, oldest to newest. It shows change from the previous scored attempt and links each selected interview to its report. The chart uses the existing signed-in history query.
 
 Interview setup shows free interviews and available paid credits using the account status API. A quota preflight rejects exhausted accounts before creating an interview or calling the planner. Interview start still reserves a slot atomically.
+
+Razorpay Test Mode sells one credit for a specific interview duration. The three sandbox prices are INR 9 for 3 minutes, INR 49 for 15 minutes, and INR 89 for 30 minutes. The free allowance is one 3-minute interview per account. See razorpay-sandbox.md for setup.

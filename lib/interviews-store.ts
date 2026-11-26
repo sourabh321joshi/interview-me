@@ -1,6 +1,7 @@
 import { ObjectId, type Document, type UpdateFilter } from "mongodb";
 import { COLLECTIONS, getDb } from "./db";
-import { interviewAllowance, type InterviewAllowance } from "./quota";
+import { FREE_DURATION, isPaidPlanDuration } from "./interview-plans";
+import { canUseFreeInterview, interviewAllowance, type InterviewAllowance } from "./quota";
 import { interviewExpiry } from "./retention";
 import type { Plan } from "./interview-schemas";
 
@@ -33,8 +34,8 @@ export interface InterviewsStore {
 export interface UsersStore {
   allowance(userId: string, freeLimit: number): Promise<InterviewAllowance>;
   ensureUser(userId: string): Promise<void>;
-  reserveSlot(userId: string, freeLimit: number): Promise<SlotSource | null>;
-  refundSlot(userId: string, source: SlotSource): Promise<void>;
+  reserveSlot(userId: string, freeLimit: number, duration?: number): Promise<SlotSource | null>;
+  refundSlot(userId: string, source: SlotSource, duration?: number): Promise<void>;
 }
 
 const oid = (id: string) => (ObjectId.isValid(id) ? new ObjectId(id) : null);
@@ -100,14 +101,24 @@ export function createMongoInterviewsStore(): InterviewsStore {
   };
 }
 
-export function createMongoUsersStore(): UsersStore {
+export function createMongoUsersStore(): UsersStore & { creditCheckout(userId: string, orderId: string, duration: number): Promise<void> } {
   const col = async () => (await getDb()).collection<{ _id: string } & Document>(COLLECTIONS.app_users);
   return {
-    async allowance(userId, freeLimit) {
-      const record = await (await col()).findOne<{ free_interviews_used?: number; paid_interview_credits?: number }>(
-        { _id: userId }, { projection: { free_interviews_used: 1, paid_interview_credits: 1 } },
+    // The receipt and the balance change share one atomic write so retries are safe.
+    async creditCheckout(userId: string, orderId: string, duration: number) {
+      await (await col()).updateOne(
+        { _id: userId, credited_razorpay_orders: { $ne: orderId } },
+        { $addToSet: { credited_razorpay_orders: orderId }, $inc: { [`paid_duration_credits.${duration}`]: 1 } },
       );
-      return interviewAllowance(freeLimit, record);
+    },
+    async allowance(userId, freeLimit) {
+      const record = await (await col()).findOne<{ free_interviews_used?: number; paid_interview_credits?: number; paid_duration_credits?: Record<string, number>; smoke_interviews_used?: number }>(
+        { _id: userId }, { projection: { free_interviews_used: 1, paid_interview_credits: 1, paid_duration_credits: 1, smoke_interviews_used: 1 } },
+      );
+      return {
+        ...interviewAllowance(freeLimit, record),
+        smoke_interviews_remaining: Math.max(0, freeLimit - (record?.smoke_interviews_used ?? 0)),
+      };
     },
     async ensureUser(userId) {
       try {
@@ -121,17 +132,21 @@ export function createMongoUsersStore(): UsersStore {
       }
     },
     // Each step is a single atomic update, so two requests can never take the same last slot.
-    async reserveSlot(userId, freeLimit) {
+    async reserveSlot(userId, freeLimit, duration) {
       const c = await col();
-      if (freeLimit > 0 && await c.findOneAndUpdate(
-        { _id: userId, $or: [{ free_interviews_used: { $lt: freeLimit } }, { free_interviews_used: { $exists: false } }] },
-        { $inc: { free_interviews_used: 1 } },
+      const freeField = duration === 60 ? "smoke_interviews_used" : "free_interviews_used";
+      const limit = duration === FREE_DURATION ? 1 : freeLimit;
+      if (canUseFreeInterview(duration) && limit > 0 && await c.findOneAndUpdate(
+        { _id: userId, $or: [{ [freeField]: { $lt: limit } }, { [freeField]: { $exists: false } }] },
+        { $inc: { [freeField]: 1 } },
       )) return "free";
-      if (await c.findOneAndUpdate({ _id: userId, paid_interview_credits: { $gt: 0 } }, { $inc: { paid_interview_credits: -1 } })) return "paid";
+      const paidField = duration !== undefined && isPaidPlanDuration(duration) ? `paid_duration_credits.${duration}` : "paid_interview_credits";
+      if (await c.findOneAndUpdate({ _id: userId, [paidField]: { $gt: 0 } }, { $inc: { [paidField]: -1 } })) return "paid";
       return null;
     },
-    async refundSlot(userId, source) {
-      await (await col()).updateOne({ _id: userId }, { $inc: source === "free" ? { free_interviews_used: -1 } : { paid_interview_credits: 1 } });
+    async refundSlot(userId, source, duration) {
+      const paidField = duration !== undefined && isPaidPlanDuration(duration) ? `paid_duration_credits.${duration}` : "paid_interview_credits";
+      await (await col()).updateOne({ _id: userId }, { $inc: source === "free" ? { [duration === 60 ? "smoke_interviews_used" : "free_interviews_used"]: -1 } : { [paidField]: 1 } });
     },
   };
 }

@@ -1,4 +1,5 @@
-import { hasInterviewSlot } from "./quota";
+import { FREE_DURATION } from "./interview-plans";
+import { hasInterviewSlot, hasInterviewSlotForDuration } from "./quota";
 import type { ApiErrorCode } from "./api-error";
 import { CreateInterviewSchema, LlmPlanSchema, timeBudget, type CreateInterviewInput, type Plan } from "./interview-schemas";
 import { canTransition } from "./interview-state";
@@ -14,7 +15,7 @@ export class DomainError extends Error {
 type Llm = { generateJson: <T>(role: "plan", schema: ZodType<T>, input: { system: string; messages: { role: "user"; content: string }[]; ctx?: CallContext }) => Promise<T> };
 export type InterviewDeps = {
   interviews: InterviewsStore; users: UsersStore; profiles: ProfilesStore; llm: Llm;
-  models: () => Record<string, string>; freeLimit: number; now?: () => Date;
+  models: () => Record<string, string>; freeLimit: number; durationPricing?: boolean; now?: () => Date;
 };
 const DAY_MS = 86_400_000;
 export const RUBRIC_VERSION = "0.1";
@@ -28,9 +29,9 @@ export async function createInterview(userId: string, raw: unknown, deps: Interv
   if (!profile) throw new DomainError("not_found", "Profile not found.");
   if (profile.status !== "ready" || !profile.summary) throw new DomainError("profile_not_ready", "Your profile is not ready yet.");
 
-  if (!hasInterviewSlot(await deps.users.allowance(userId, deps.freeLimit))) {
-    throw new DomainError("quota_exceeded", "You have no interviews left.");
-  }
+  const allowance = await deps.users.allowance(userId, deps.durationPricing && input.duration_seconds === FREE_DURATION ? 1 : deps.freeLimit);
+  const available = deps.durationPricing ? hasInterviewSlotForDuration(allowance, input.duration_seconds) : hasInterviewSlot(allowance);
+  if (!available) throw new DomainError("quota_exceeded", "You have no credit for this interview length.");
   const models = deps.models(); // fails early on missing config, before anything is saved
   const now = deps.now?.() ?? new Date();
   const id = await deps.interviews.insert({
@@ -65,7 +66,8 @@ export async function startInterview(userId: string, id: string, deps: Interview
   if (!canTransition(iv.status, "in_progress")) throw new DomainError("interview_not_active", "This interview can't be started.");
 
   await deps.users.ensureUser(userId);
-  const source = await deps.users.reserveSlot(userId, deps.freeLimit);
+  const duration = deps.durationPricing ? iv.duration_seconds : undefined;
+  const source = await deps.users.reserveSlot(userId, deps.freeLimit, duration);
   if (!source) throw new DomainError("quota_exceeded", "You have no interviews left.");
 
   const startedAt = deps.now?.() ?? new Date();
@@ -73,7 +75,7 @@ export async function startInterview(userId: string, id: string, deps: Interview
     started_at: startedAt, ends_at: new Date(startedAt.getTime() + iv.duration_seconds * 1000), slot_source: source,
   });
   if (!started) {
-    await deps.users.refundSlot(userId, source); // lost a race or the state changed: give the slot back
+    await deps.users.refundSlot(userId, source, duration); // lost a race or the state changed: give the slot back
     throw new DomainError("interview_not_active", "This interview can't be started.");
   }
   return started;

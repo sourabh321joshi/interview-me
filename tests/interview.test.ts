@@ -27,6 +27,22 @@ async function setup(opts: { freeLimit?: number; paid?: number; llmScript?: Arra
 }
 
 describe("createInterview", () => {
+  it("allows the free 3-minute plan once and spends paid credits only for their purchased duration", async () => {
+    const { deps, pid, users, calls } = await setup({ freeLimit: 100 });
+    deps.durationPricing = true;
+    users.users.set("u1", { free: 0, paid: 0, durations: { 900: 1, 180: 1 } });
+    await expect(createInterview("u1", input(pid, { duration_seconds: 1800 }), deps)).rejects.toMatchObject({ code: "quota_exceeded" });
+    expect(calls).toHaveLength(0);
+    const free = await createInterview("u1", input(pid, { duration_seconds: 180 }), deps);
+    expect(await startInterview("u1", free.id, deps)).toMatchObject({ slot_source: "free", duration_seconds: 180 });
+    const repeat = await createInterview("u1", input(pid, { duration_seconds: 180 }), deps);
+    expect(await startInterview("u1", repeat.id, deps)).toMatchObject({ slot_source: "paid" });
+    await expect(createInterview("u1", input(pid, { duration_seconds: 180 }), deps)).rejects.toMatchObject({ code: "quota_exceeded" });
+    const full = await createInterview("u1", input(pid, { duration_seconds: 900 }), deps);
+    expect(await startInterview("u1", full.id, deps)).toMatchObject({ slot_source: "paid", duration_seconds: 900 });
+    expect(users.users.get("u1")).toMatchObject({ free: 1, durations: { 180: 0, 900: 0 } });
+  });
+
   it("rejects exhausted accounts before saving an interview or spending a model request", async () => {
     const { deps, pid, interviews, calls } = await setup();
     const first = await createInterview("u1", input(pid), deps);
@@ -67,11 +83,13 @@ describe("createInterview", () => {
       vi.stubEnv("NODE_ENV", "production");
       expect(CreateInterviewSchema.safeParse(settings("p")).success).toBe(false);
       vi.stubEnv("NODE_ENV", "development");
-      const { deps, pid } = await setup();
+      const { deps, pid, users } = await setup();
+      deps.durationPricing = true;
       const planned = await createInterview("u1", settings(pid), deps);
       const started = await startInterview("u1", planned.id, deps);
       expect(started.ends_at?.getTime()).toBe(NOW.getTime() + 60_000);
       expect(planned.plan?.time_budget_seconds.wrapup).toBe(6);
+      expect(users.users.get("u1")).toMatchObject({ free: 0, smoke: 1 });
     } finally {
       vi.unstubAllEnvs();
     }

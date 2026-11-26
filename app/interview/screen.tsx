@@ -7,7 +7,8 @@ import { playQuestionClip } from "./play-question-clip";
 import InterviewRoom, { type RoomTurn } from "./interview-room";
 import ReviewProfile from "./review-profile";
 import type { Warning } from "@/lib/profile-builder";
-import { hasInterviewSlot, type InterviewAllowance } from "@/lib/quota";
+import { supportsCoding } from "@/lib/interview-plans";
+import type { InterviewAllowance } from "@/lib/quota";
 import type { ProfileSummary } from "@/lib/schemas";
 import { useEffect, useRef, useState } from "react";
 
@@ -163,7 +164,7 @@ export default function InterviewPage() {
     const v = await api(`/api/v1/interviews/${id}`);
     setInterviewId(id);
     setVoiceMode(v.mode === "voice");
-    setStandard(v.duration_seconds === 600);
+    setStandard(supportsCoding(v.duration_seconds));
     setTurns(v.turns.map((t: RoomTurn) => ({ speaker: t.speaker, text: t.text, seq: t.seq, kind: t.kind, output: t.output })));
     setEndsAt(v.ends_at ? new Date(v.ends_at).getTime() : null);
     const receivedAt = Date.now();
@@ -246,7 +247,7 @@ export default function InterviewPage() {
   }, [stage]);
 
   async function startInterview(form: FormData) {
-    if (!profile || busy || quota === undefined || (quota && !hasInterviewSlot(quota))) return;
+    if (!profile || busy || quota === undefined) return;
     setError("");
     setBusy("Preparing your interview…");
     const settings = JSON.stringify({
@@ -271,7 +272,7 @@ export default function InterviewPage() {
       plannedInterview.current = null;
       window.history.replaceState(null, "", `?interview=${iv.id}`);
       setVoiceMode(!!form.get("luna"));
-      setStandard(Number(form.get("duration")) === 600);
+      setStandard(supportsCoding(Number(form.get("duration"))));
       setInterviewId(iv.id);
       setEndsAt(new Date(started.ends_at).getTime());
       const receivedAt = Date.now();
@@ -281,7 +282,9 @@ export default function InterviewPage() {
       await runTurn(iv.id, { type: "open", client_turn_id: crypto.randomUUID() });
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === "quota_exceeded") {
-        setQuota({ free_interviews_remaining: 0, paid_credits: 0 });
+        setError(errorText(err));
+        const account = await api("/api/v1/me").catch(() => null);
+        setQuota(account);
       } else {
         setError(errorText(err));
       }

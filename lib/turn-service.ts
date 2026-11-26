@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { supportsCoding } from "./interview-plans";
 import { codingChallenge } from "./coding-challenge";
 import { SMOKE_TEST_DURATION, timeBudget } from "./interview-schemas";
 import { DomainError } from "./interview-service";
@@ -113,7 +114,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
 
   const iv = await deps.interviews.findOwned(userId, id);
   if (!iv) throw new DomainError("not_found", "Interview not found.");
-  if (body.type === "code" && iv.duration_seconds !== 600) {
+  if (body.type === "code" && !supportsCoding(iv.duration_seconds)) {
     throw new DomainError("validation_failed", "Code submissions require a Standard interview.");
   }
   const now = deps.now?.() ?? new Date();
@@ -194,7 +195,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
   }, iv.prompt_version === "0.1" ? "0.1" : INTERVIEWER_PROMPT_VERSION) + "\n\nINTERVIEW PLAN (data from the planner)\n" + wrapData("interview_plan", JSON.stringify(plan));
 
   const tag = (ms: number) => `[elapsed: ${fmt(ms)} of ${fmt(iv.duration_seconds * 1000)}]`;
-  const interviewSystem = iv.duration_seconds === 600
+  const interviewSystem = supportsCoding(iv.duration_seconds)
     ? system + "\n\n" + loadPrompt("interviewer-coding", { challenge: codingChallenge.task, examples: JSON.stringify(codingChallenge.cases) })
     : system;
   const messages: Message[] = [{ role: "user", content: `${tag(0)} (The interview is starting. Greet the candidate and ask your first question.)` }];

@@ -1,4 +1,5 @@
-import { interviewAllowance } from "@/lib/quota";
+import { FREE_DURATION, isPaidPlanDuration } from "@/lib/interview-plans";
+import { canUseFreeInterview, interviewAllowance } from "@/lib/quota";
 import type { InterviewDoc, InterviewsStore, SlotSource, UsersStore } from "@/lib/interviews-store";
 
 export function memoryInterviews(): InterviewsStore & { docs: Map<string, InterviewDoc> } {
@@ -42,21 +43,43 @@ export function memoryInterviews(): InterviewsStore & { docs: Map<string, Interv
   };
 }
 
-export function memoryUsers(paid = 0): UsersStore & { users: Map<string, { free: number; paid: number }> } {
-  const users = new Map<string, { free: number; paid: number }>();
+type MemoryAccount = { free: number; paid: number; smoke?: number; durations?: Record<string, number> };
+
+export function memoryUsers(paid = 0): UsersStore & { users: Map<string, MemoryAccount> } {
+  const users = new Map<string, MemoryAccount>();
   return {
     users,
     async allowance(u, limit) {
       const account = users.get(u);
-      return interviewAllowance(limit, { free_interviews_used: account?.free, paid_interview_credits: account?.paid ?? paid });
+      return {
+        ...interviewAllowance(limit, {
+          free_interviews_used: account?.free, paid_interview_credits: account?.paid ?? paid, paid_duration_credits: account?.durations,
+        }),
+        smoke_interviews_remaining: Math.max(0, limit - (account?.smoke ?? 0)),
+      };
     },
     async ensureUser(u) { if (!users.has(u)) users.set(u, { free: 0, paid }); },
-    async reserveSlot(u, limit): Promise<SlotSource | null> { // check and update in one step, like the real atomic update
+    async reserveSlot(u, limit, duration): Promise<SlotSource | null> {
       const x = users.get(u)!;
-      if (x.free < limit) { x.free++; return "free"; }
+      const freeField = duration === 60 ? "smoke" : "free";
+      if (canUseFreeInterview(duration) && (x[freeField] ?? 0) < (duration === FREE_DURATION ? 1 : limit)) {
+        x[freeField] = (x[freeField] ?? 0) + 1;
+        return "free";
+      }
+      if (duration !== undefined && isPaidPlanDuration(duration)) {
+        if (!x.durations?.[duration]) return null;
+        x.durations[duration]--;
+        return "paid";
+      }
       if (x.paid > 0) { x.paid--; return "paid"; }
       return null;
     },
-    async refundSlot(u, source) { const x = users.get(u)!; if (source === "free") x.free--; else x.paid++; },
+    async refundSlot(u, source, duration) {
+      const x = users.get(u)!;
+      if (source === "free" && duration === 60) x.smoke = (x.smoke ?? 0) - 1;
+      else if (source === "free") x.free--;
+      else if (duration !== undefined && isPaidPlanDuration(duration)) x.durations![duration]++;
+      else x.paid++;
+    },
   };
 }

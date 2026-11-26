@@ -135,7 +135,7 @@ Standard list, read, and delete. Deleting leaves existing interviews intact.
   "profile_id": "6650a1b2c3d4e5f6a7b8c9d0",
   "role": "frontend",
   "level": "fresher",
-  "duration_seconds": 300,
+  "duration_seconds": 180,
   "mode": "voice"
 }
 ```
@@ -148,12 +148,12 @@ Validates the profile (`ready`) and consent, generates the plan, and returns `20
   "status": "plan_ready",
   "role": "frontend",
   "level": "fresher",
-  "duration_seconds": 300,
+  "duration_seconds": 180,
   "mode": "voice"
 }
 ```
 
-The server checks that a free interview or paid credit is available before generating the plan. An exhausted account receives `402 quota_exceeded`. Starting the interview reserves the slot.
+The server checks for a slot matching the requested duration before generating the plan. The one-time free slot applies to 180 seconds. Razorpay sandbox credits apply to the purchased 180-, 900-, or 1,800-second duration. An unavailable duration returns `402 quota_exceeded`. Starting the interview reserves the slot.
 
 ### POST `/interviews/:id/start`
 
