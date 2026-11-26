@@ -42,7 +42,7 @@ export default function InterviewSetup({ busy, error, onStart, onReview }: {
       </header>
       <div className="mx-auto mt-9 max-w-3xl sm:mt-12">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Set up your interview</h1>
-        <p className="mt-3 text-muted">Choose the role, level, and length for your text practice interview.</p>
+        <p className="mt-3 text-muted">Choose the role, level, and length for your practice interview.</p>
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -69,6 +69,7 @@ export default function InterviewSetup({ busy, error, onStart, onReview }: {
                 {durations.map((option, i) => <Choice key={option.value} name="duration" option={option} defaultChecked={i === 0} />)}
               </div>
             </fieldset>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="luna" /> Read questions aloud with Luna (sends question text to Deepgram)</label>
             <div className="flex flex-wrap items-center gap-4 border-t border-line pt-5">
               <button type="submit" className="action">{busy || "Start interview"}</button>
               <button type="button" className="text-sm font-semibold text-indigo-300 underline disabled:opacity-50" onClick={onReview}>Review profile</button>

@@ -32,7 +32,7 @@ async function streamTurn(interviewId: string, body: object, onDelta: (t: string
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
-  let result: { text: string; is_final: boolean } | null = null;
+  let result: { seq: number; text: string; is_final: boolean } | null = null;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -44,7 +44,7 @@ async function streamTurn(interviewId: string, body: object, onDelta: (t: string
       const event = /event: (.+)/.exec(frame)?.[1];
       const data = JSON.parse(/data: (.+)/.exec(frame)?.[1] ?? "{}");
       if (event === "text.delta") onDelta(data.text);
-      else if (event === "turn.end") result = { text: data.text, is_final: data.is_final };
+      else if (event === "turn.end") result = { seq: data.seq, text: data.text, is_final: data.is_final };
       else if (event === "error") throw new Error(data.message ?? "The interviewer could not reply.");
     }
   }
@@ -58,6 +58,7 @@ export default function InterviewPage() {
   const [profile, setProfile] = useState<{ id: string; summary: ProfileSummary; warnings?: Warning[] } | null>(null);
   const [manualJob, setManualJob] = useState("");
   const [interviewId, setInterviewId] = useState("");
+  const [voiceMode, setVoiceMode] = useState(false);
   const [turns, setTurns] = useState<RoomTurn[]>([]);
   const [live, setLive] = useState("");
   const [busy, setBusy] = useState("");
@@ -87,7 +88,7 @@ export default function InterviewPage() {
     try {
       let acc = "";
       const r = await streamTurn(id, body, (d) => { acc += d; setLive(acc); });
-      setTurns((t) => [...t, { speaker: "interviewer", text: r.text }]);
+      setTurns((t) => [...t, { speaker: "interviewer", seq: r.seq, text: r.text }]);
       setPending(null);
       if (r.is_final) setFinished(true);
     } catch (e) {
@@ -101,7 +102,8 @@ export default function InterviewPage() {
   async function loadInterview(id: string) {
     const v = await api(`/api/v1/interviews/${id}`);
     setInterviewId(id);
-    setTurns(v.turns.map((t: RoomTurn) => ({ speaker: t.speaker, text: t.text })));
+    setVoiceMode(v.mode === "voice");
+    setTurns(v.turns.map((t: RoomTurn) => ({ speaker: t.speaker, text: t.text, seq: t.seq })));
     setEndsAt(v.ends_at ? new Date(v.ends_at).getTime() : null);
     const receivedAt = Date.now();
     setNow(receivedAt);
@@ -177,7 +179,7 @@ export default function InterviewPage() {
       role: form.get("role"),
       level: form.get("level"),
       duration_seconds: Number(form.get("duration")),
-      mode: "text",
+      mode: form.get("luna") ? "voice" : "text",
     });
 
     try {
@@ -193,6 +195,7 @@ export default function InterviewPage() {
       const started = await api(`/api/v1/interviews/${iv.id}/start`, { method: "POST" });
       plannedInterview.current = null;
       window.history.replaceState(null, "", `?interview=${iv.id}`);
+      setVoiceMode(!!form.get("luna"));
       setInterviewId(iv.id);
       setEndsAt(new Date(started.ends_at).getTime());
       const receivedAt = Date.now();
@@ -253,7 +256,7 @@ export default function InterviewPage() {
   }
 
   return (
-    <InterviewRoom
+    <InterviewRoom voiceMode={voiceMode}
       interviewId={interviewId}
       turns={turns}
       live={live}

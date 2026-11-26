@@ -85,3 +85,7 @@ The interview room can play the latest completed interviewer question with an on
 A disposable one-minute interview in Edge verified first-click playback, Stop playback, replay to completion, and microphone control locking. Device voice loading starts when the room mounts. The test used a prewritten question and no AI API calls.
 
 The voice test offers opt-in Asteria and Luna Aura MP3 previews of a fixed UPI question. Replays reuse the sample while the page is open. Interview voice selection awaits listening feedback.
+
+Interview setup offers opt-in automatic Luna playback of completed interviewer questions. The proxy verifies ownership and question text, reserves a 6,000-character budget, and logs usage. Candidates can stop Luna or use device playback if audio is unavailable.
+
+Automated tests verified that Luna requests sentences in order and releases dictation after the last simulated audio clip. End-to-end audible interview playback remains unverified.

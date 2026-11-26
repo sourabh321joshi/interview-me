@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import LunaQuestion from "./luna-question";
 import LiveCaptions from "../voice-test/live-captions";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
-export type RoomTurn = { speaker: "interviewer" | "candidate"; text: string };
+export type RoomTurn = { seq?: number; speaker: "interviewer" | "candidate"; text: string };
 
 type Props = {
+  voiceMode: boolean;
   interviewId: string;
   turns: RoomTurn[];
   live: string;
@@ -28,10 +30,13 @@ function clock(seconds: number) {
 }
 
 export default function InterviewRoom({
-  interviewId, turns, live, remaining, finished, replying, awaitingReply, ending,
+  voiceMode, interviewId, turns, live, remaining, finished, replying, awaitingReply, ending,
   error, draft, onDraft, onSend, onRetry, onEnd,
 }: Props) {
   const [recording, setRecording] = useState(false);
+  const [lunaPlaying, setLunaPlaying] = useState(false);
+  const [skippedSeq, setSkippedSeq] = useState<number>();
+  const latest = turns.at(-1);
   const [speaking, setSpeaking] = useState(false);
   const [playbackError, setPlaybackError] = useState("");
   const utterance = useRef<SpeechSynthesisUtterance | null>(null);
@@ -90,7 +95,7 @@ export default function InterviewRoom({
     }
   }
 
-  const status = speaking ? "Playing interviewer question..." : finished ? "Interview complete" : expired ? "Time is up" : ending ? "Ending interview…" : replying
+  const status = lunaPlaying ? "Luna is reading the question..." : speaking ? "Playing interviewer question..." : finished ? "Interview complete" : expired ? "Time is up" : ending ? "Ending interview…" : replying
     ? live ? "Interviewer is responding…" : "Interviewer is thinking…"
     : awaitingReply ? "Reply interrupted" : "Your turn";
 
@@ -128,7 +133,10 @@ export default function InterviewRoom({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-6">
           <h2 id="conversation-title" className="text-sm font-semibold">Conversation</h2>
           <div className="flex flex-wrap items-center gap-3">
-            {(speaking || (!finished && latestQuestion)) && <button type="button" onClick={togglePlayback}
+            {voiceMode && canAnswer && latest?.speaker === "interviewer" && latest.seq !== undefined && latest.seq !== skippedSeq &&
+              <LunaQuestion key={latest.seq} id={interviewId} seq={latest.seq} text={latest.text} onSpeaking={setLunaPlaying} />}
+            {lunaPlaying && <button type="button" className="text-sm underline" onClick={() => setSkippedSeq(latest?.seq)}>Stop Luna</button>}
+            {!lunaPlaying && (speaking || (!finished && latestQuestion)) && <button type="button" onClick={togglePlayback}
               disabled={!speaking && (recording || !canAnswer)}
               className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold hover:border-indigo-400 disabled:opacity-50">
               {speaking ? "Stop playback" : "Play question"}
@@ -191,7 +199,7 @@ export default function InterviewRoom({
                 placeholder={expired ? "The interview time has ended." : awaitingReply ? "Wait for the interviewer’s reply." : "Type your answer…"} />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-            {canAnswer && <LiveCaptions disabled={speaking} interviewId={interviewId} showCaptions={showCaptions} onRecording={setRecording}
+            {canAnswer && <LiveCaptions disabled={speaking || lunaPlaying} interviewId={interviewId} showCaptions={showCaptions} onRecording={setRecording}
               onWords={words => onDraft(previous => [previous.trimEnd(), words].filter(Boolean).join(" ").slice(0, 2000))} />}
                 <p id="interview-answer-hint" className="mt-1 hidden text-xs text-muted sm:block">Enter to send · Shift + Enter for a new line</p>
               </div>
