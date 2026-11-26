@@ -126,3 +126,7 @@ A disposable account ran one live OpenAI and Deepgram benchmark with a fictional
 | Total | | $0.10044 |
 
 Published rates for [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [GPT-4.1](https://developers.openai.com/api/docs/models/gpt-4.1), and [Deepgram](https://deepgram.com/pricing) put this run at approximately INR 9.29 using INR 92.5 per USD. At INR 89 and [Razorpay's standard domestic fee](https://razorpay.com/blog/razorpay-payment-gateway-pricing-explained), including GST on that fee, about INR 77.61 remained for this run before hosting, support, refunds, and applicable sales taxes. The session ended before the timer expired. Usage during a session that reaches the full duration and the billed amounts still need verification.
+
+## M5 beta staging
+
+Verified a local production build with a separate MongoDB database and fictitious account. Database health and indexes, signup, consent, manual profile persistence, the one-time free allowance, protected routes, and account deletion passed. Production rejected the development-only one-minute interview. All 134 tests, lint, and typecheck passed. The smoke test made no paid API calls. The [private staging runbook](staging.md) covers hosted setup and the remaining end-to-end checks.
