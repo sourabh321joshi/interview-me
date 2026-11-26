@@ -88,7 +88,7 @@ export type TurnEnd = { seq: number; text: string; is_final: boolean; remaining_
 export type TurnEvent = { type: "delta"; text: string } | ({ type: "end" } & TurnEnd);
 export type Prepared =
   | { kind: "replay"; end: TurnEnd }
-  | { kind: "stream"; start: { seq: number; phase: string; remaining_seconds: number }; run: () => AsyncGenerator<TurnEvent> };
+  | { kind: "stream"; voice?: boolean; start: { seq: number; phase: string; remaining_seconds: number }; run: () => AsyncGenerator<TurnEvent> };
 export type TurnDeps = {
   interviews: InterviewsStore; profiles: ProfilesStore; now?: () => Date;
   llm: { streamTurn(input: { system: string; messages: Message[]; ctx?: CallContext }): AsyncGenerator<string> };
@@ -217,7 +217,7 @@ ${MARKER}`]
     if (strip.isFinal) await deps.interviews.complete(userId, id, wantsToEnd ? "user_ended" : "model_finished", doneAt);
     yield { type: "end", seq, text, is_final: strip.isFinal, remaining_seconds: remaining };
   }
-  return { kind: "stream", start: { seq, phase, remaining_seconds: remaining }, run };
+  return { kind: "stream", voice: iv.mode === "voice" && !wantsToEnd, start: { seq, phase, remaining_seconds: remaining }, run };
 }
 
 export async function getInterviewView(userId: string, id: string, deps: Pick<TurnDeps, "interviews" | "now">) {

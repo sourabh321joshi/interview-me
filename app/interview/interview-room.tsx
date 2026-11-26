@@ -9,6 +9,10 @@ export type RoomTurn = { seq?: number; speaker: "interviewer" | "candidate"; tex
 
 type Props = {
   voiceMode: boolean;
+  streamedVoiceSeq?: number;
+  streamingAudio: boolean;
+  voiceError: string;
+  onStopStreamingAudio: () => void;
   interviewId: string;
   turns: RoomTurn[];
   live: string;
@@ -30,11 +34,12 @@ function clock(seconds: number) {
 }
 
 export default function InterviewRoom({
-  voiceMode, interviewId, turns, live, remaining, finished, replying, awaitingReply, ending,
+  voiceMode, streamedVoiceSeq, streamingAudio, voiceError, onStopStreamingAudio, interviewId, turns, live, remaining, finished, replying, awaitingReply, ending,
   error, draft, onDraft, onSend, onRetry, onEnd,
 }: Props) {
   const [recording, setRecording] = useState(false);
-  const [lunaPlaying, setLunaPlaying] = useState(false);
+  const [completedAudio, setCompletedAudio] = useState(false);
+  const lunaPlaying = completedAudio || streamingAudio;
   const [skippedSeq, setSkippedSeq] = useState<number>();
   const latest = turns.at(-1);
   const [speaking, setSpeaking] = useState(false);
@@ -121,7 +126,7 @@ export default function InterviewRoom({
           {finished ? (
             <Link href={`/report?interview=${interviewId}`} className="action text-sm">View feedback</Link>
           ) : (
-            <button type="button" onClick={() => void onEnd()} disabled={busy || speaking}
+            <button type="button" onClick={() => void onEnd()} disabled={busy || speaking || lunaPlaying}
               className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-muted hover:border-indigo-400 hover:text-white disabled:opacity-50">
               {ending ? "Ending…" : "End and get feedback"}
             </button>
@@ -133,15 +138,15 @@ export default function InterviewRoom({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-6">
           <h2 id="conversation-title" className="text-sm font-semibold">Conversation</h2>
           <div className="flex flex-wrap items-center gap-3">
-            {voiceMode && canAnswer && latest?.speaker === "interviewer" && latest.seq !== undefined && latest.seq !== skippedSeq &&
-              <LunaQuestion key={latest.seq} id={interviewId} seq={latest.seq} text={latest.text} onSpeaking={setLunaPlaying} />}
-            {lunaPlaying && <button type="button" className="text-sm underline" onClick={() => setSkippedSeq(latest?.seq)}>Stop Luna</button>}
+            {voiceMode && canAnswer && latest?.speaker === "interviewer" && latest.seq !== undefined && latest.seq !== skippedSeq && latest.seq !== streamedVoiceSeq &&
+              <LunaQuestion key={latest.seq} id={interviewId} seq={latest.seq} text={latest.text} onSpeaking={setCompletedAudio} />}
+            {lunaPlaying && <button type="button" className="text-sm underline" onClick={streamingAudio ? onStopStreamingAudio : () => setSkippedSeq(latest?.seq)}>Stop Luna</button>}
             {!lunaPlaying && (speaking || (!finished && latestQuestion)) && <button type="button" onClick={togglePlayback}
               disabled={!speaking && (recording || !canAnswer)}
               className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold hover:border-indigo-400 disabled:opacity-50">
               {speaking ? "Stop playback" : "Play question"}
             </button>}
-            <p role="status" className="text-sm text-muted">{status}</p>
+            <p role="status" className="text-sm text-muted">{voiceError || status}</p>
             {!finished && <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input type="checkbox" checked={showCaptions} onChange={event => setShowCaptions(event.target.checked)}
                 className="size-4 accent-indigo-500" />
@@ -181,7 +186,7 @@ export default function InterviewRoom({
           </div>
         )}
         {!finished && (
-          <form onSubmit={(event) => { event.preventDefault(); if (canAnswer && !recording && !speaking) void onSend(); }}
+          <form onSubmit={(event) => { event.preventDefault(); if (canAnswer && !recording && !speaking && !lunaPlaying) void onSend(); }}
             className="max-h-[60dvh] shrink-0 space-y-2 overflow-y-auto border-t border-line px-4 py-3 sm:px-6">
             <div className="flex items-baseline justify-between gap-3">
               <label htmlFor="interview-answer" className="text-base font-semibold">Your answer</label>
@@ -203,7 +208,7 @@ export default function InterviewRoom({
               onWords={words => onDraft(previous => [previous.trimEnd(), words].filter(Boolean).join(" ").slice(0, 2000))} />}
                 <p id="interview-answer-hint" className="mt-1 hidden text-xs text-muted sm:block">Enter to send · Shift + Enter for a new line</p>
               </div>
-              <button disabled={!canAnswer || recording || speaking || !draft.trim()} className="action shrink-0">Send</button>
+              <button disabled={!canAnswer || recording || speaking || lunaPlaying || !draft.trim()} className="action shrink-0">Send</button>
             </div>
           </form>
         )}

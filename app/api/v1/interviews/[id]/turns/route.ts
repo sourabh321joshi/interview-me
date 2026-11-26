@@ -5,6 +5,7 @@ import { rateLimited } from "@/lib/route-guard";
 import { interviewDeps } from "@/lib/deps";
 import { getLlm } from "@/lib/llm";
 import { handleError } from "@/lib/route-errors";
+import { questionSegments, voiceProof } from "@/lib/streamed-voice";
 import { prepareTurn, type Prepared } from "@/lib/turn-service";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -17,9 +18,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json().catch(() => null);
   if (!body) return apiError("validation_failed", "Send a JSON body.");
   const deps = interviewDeps();
+  const { id } = await params;
   let prepared: Prepared;
   try {
-    prepared = await prepareTurn(userId, (await params).id, body, { interviews: deps.interviews, profiles: deps.profiles, llm: getLlm() });
+    prepared = await prepareTurn(userId, id, body, { interviews: deps.interviews, profiles: deps.profiles, llm: getLlm() });
   } catch (err) {
     return handleError(err);
   }
@@ -33,9 +35,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           controller.enqueue(frame("turn.end", prepared.end));
         } else {
           controller.enqueue(frame("turn.start", prepared.start));
+          let tail = "";
           for await (const ev of prepared.run()) {
             if (ev.type === "delta") controller.enqueue(frame("text.delta", { text: ev.text }));
-            else controller.enqueue(frame("turn.end", { seq: ev.seq, text: ev.text, is_final: ev.is_final, remaining_seconds: ev.remaining_seconds }));
+            if (prepared.voice) {
+              const seq = prepared.start.seq;
+              const result = questionSegments(tail + (ev.type === "delta" ? ev.text : ""), ev.type === "end");
+              tail = result.tail;
+              for (const text of result.clips) {
+                const proof = voiceProof(userId, id, seq, text);
+                if (proof) controller.enqueue(frame("voice.clip", { seq, text, proof }));
+              }
+            }
+            if (ev.type === "end") controller.enqueue(frame("turn.end", { seq: ev.seq, text: ev.text, is_final: ev.is_final, remaining_seconds: ev.remaining_seconds }));
           }
         }
       } catch {

@@ -27,3 +27,19 @@ it("waits for each sentence to finish and releases dictation after the last", as
   await vi.advanceTimersByTimeAsync(1);
   expect(speaking.mock.calls).toEqual([[true], [false]]);
 });
+
+it("stops the active clip when the user cancels playback", async () => {
+  vi.useFakeTimers();
+  const player = { play: vi.fn(async () => {}), pause: vi.fn(), onended: null, onerror: null };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("sample")));
+  const { playQuestionClip } = await import("@/app/interview/play-question-clip");
+  const controller = new AbortController();
+  const result = playQuestionClip(player as unknown as HTMLAudioElement, "fixture", { seq: 1, text: "Describe your project." }, controller.signal);
+  const canceled = expect(result).rejects.toMatchObject({ name: "AbortError" });
+  await vi.advanceTimersByTimeAsync(1);
+  expect(player.play).toHaveBeenCalledOnce();
+  controller.abort();
+  await canceled;
+  expect(player.pause).toHaveBeenCalledOnce();
+  expect(player.onended).toBeNull();
+});

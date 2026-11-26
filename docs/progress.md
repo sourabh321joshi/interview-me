@@ -89,3 +89,5 @@ The voice test offers opt-in Asteria and Luna Aura MP3 previews of a fixed UPI q
 Interview setup offers opt-in automatic Luna playback of completed interviewer questions. The proxy verifies ownership and question text, reserves a 6,000-character budget, and logs usage. Candidates can stop Luna or use device playback if audio is unavailable.
 
 Automated tests verified that Luna requests sentences in order and releases dictation after the last simulated audio clip. End-to-end audible interview playback remains unverified.
+
+Luna now queues authorized sentences as reply text streams. The one-minute simulated test verifies that the first sentence is available before the next text chunk. Browser performance records the time from requesting a turn to starting its first audio clip as interview-first-audio.

@@ -3,11 +3,14 @@
 import { useRouter } from "next/navigation";
 import AddContext from "./add-context";
 import InterviewSetup from "./interview-setup";
+import { playQuestionClip } from "./play-question-clip";
 import InterviewRoom, { type RoomTurn } from "./interview-room";
 import ReviewProfile from "./review-profile";
 import type { Warning } from "@/lib/profile-builder";
 import type { ProfileSummary } from "@/lib/schemas";
 import { useEffect, useRef, useState } from "react";
+
+type VoiceClip = { seq: number; text: string; proof: string };
 
 type TurnRequest = { type: "open" | "answer"; client_turn_id: string; text?: string };
 
@@ -21,7 +24,7 @@ async function api(url: string, init?: RequestInit) {
 }
 
 // Reads the server-sent events from the turn endpoint.
-async function streamTurn(interviewId: string, body: object, onDelta: (t: string) => void) {
+async function streamTurn(interviewId: string, body: object, onDelta: (t: string) => void, onClip: (clip: VoiceClip) => void) {
   const res = await fetch(`/api/v1/interviews/${interviewId}/turns`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
@@ -44,6 +47,7 @@ async function streamTurn(interviewId: string, body: object, onDelta: (t: string
       const event = /event: (.+)/.exec(frame)?.[1];
       const data = JSON.parse(/data: (.+)/.exec(frame)?.[1] ?? "{}");
       if (event === "text.delta") onDelta(data.text);
+      else if (event === "voice.clip") onClip(data);
       else if (event === "turn.end") result = { seq: data.seq, text: data.text, is_final: data.is_final };
       else if (event === "error") throw new Error(data.message ?? "The interviewer could not reply.");
     }
@@ -58,6 +62,11 @@ export default function InterviewPage() {
   const [profile, setProfile] = useState<{ id: string; summary: ProfileSummary; warnings?: Warning[] } | null>(null);
   const [manualJob, setManualJob] = useState("");
   const [interviewId, setInterviewId] = useState("");
+  const [streamedVoiceSeq, setStreamedVoiceSeq] = useState<number>();
+  const [streamingAudio, setStreamingAudio] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  const voiceRun = useRef<AbortController | null>(null);
+  useEffect(() => () => voiceRun.current?.abort(), []);
   const [voiceMode, setVoiceMode] = useState(false);
   const [turns, setTurns] = useState<RoomTurn[]>([]);
   const [live, setLive] = useState("");
@@ -80,20 +89,62 @@ export default function InterviewPage() {
   const remaining = endsAt && now ? Math.max(0, Math.ceil((endsAt - (now + offset)) / 1000)) : null;
   const timeUp = remaining === 0;
 
+  function stopStreamingAudio() {
+    voiceRun.current?.abort();
+    voiceRun.current = null;
+    setStreamingAudio(false);
+  }
+
+  useEffect(() => {
+    if (timeUp) voiceRun.current?.abort();
+  }, [timeUp]);
+
   async function runTurn(id: string, body: TurnRequest) {
     setError("");
     setLive("");
     setPending(body);
     setBusy("The interviewer is replying…");
+    setVoiceError("");
+    const controller = new AbortController();
+    voiceRun.current?.abort();
+    voiceRun.current = controller;
+    const requestedAt = performance.now();
+    let queue = Promise.resolve();
+    let player: HTMLAudioElement | undefined;
+    let firstAudio = true;
+    function enqueue(clip: VoiceClip) {
+      setStreamedVoiceSeq(clip.seq);
+      if (controller.signal.aborted) return;
+      setStreamingAudio(true);
+      player ??= new Audio();
+      const audio = player;
+      queue = queue.then(() => playQuestionClip(audio, id, clip, controller.signal, () => {
+        if (!firstAudio) return;
+        firstAudio = false;
+        performance.measure("interview-first-audio", { start: requestedAt, end: performance.now() });
+      })).catch(() => {
+        if (!controller.signal.aborted) {
+          setVoiceError("Luna playback unavailable. Select Play question to use your device voice.");
+          controller.abort();
+        }
+      });
+    }
     try {
       let acc = "";
-      const r = await streamTurn(id, body, (d) => { acc += d; setLive(acc); });
+      const r = await streamTurn(id, body, (d) => { acc += d; setLive(acc); }, enqueue);
       setTurns((t) => [...t, { speaker: "interviewer", seq: r.seq, text: r.text }]);
       setPending(null);
       if (r.is_final) setFinished(true);
     } catch (e) {
+      controller.abort();
       setError(errorText(e));
     } finally {
+      void queue.finally(() => {
+        if (voiceRun.current === controller) {
+          voiceRun.current = null;
+          setStreamingAudio(false);
+        }
+      });
       setLive("");
       setBusy("");
     }
@@ -257,6 +308,10 @@ export default function InterviewPage() {
 
   return (
     <InterviewRoom voiceMode={voiceMode}
+      streamedVoiceSeq={streamedVoiceSeq}
+      streamingAudio={streamingAudio}
+      voiceError={voiceError}
+      onStopStreamingAudio={stopStreamingAudio}
       interviewId={interviewId}
       turns={turns}
       live={live}

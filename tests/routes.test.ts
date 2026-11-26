@@ -86,6 +86,33 @@ beforeEach(() => { state.w = makeWorld([["Hi."], ["Why?"], ["Thanks."]]); setRat
 afterEach(() => { vi.restoreAllMocks(); delete process.env.RATE_GENERAL_PER_MINUTE; delete process.env.RATE_PROFILES_PER_DAY; });
 
 describe("routes", () => {
+  it("authorizes the first voice sentence before the interviewer reply ends", async () => {
+    vi.stubEnv("BETTER_AUTH_SECRET", "fixture-signing-secret");
+    vi.stubEnv("NODE_ENV", "development");
+    try {
+      state.user = "u1";
+      state.w = makeWorld([["Describe your project. What", " did you learn?"]]);
+      const profile = await (await postProfiles(pdfRequest())).json();
+      const created = await postInterviews(req("/api/v1/interviews", {
+        profile_id: profile.id, role: "frontend", level: "fresher", duration_seconds: 60, mode: "voice",
+      }));
+      expect(created.status).toBe(201);
+      const { id } = await created.json();
+      expect((await postStart(req("/start"), params(id))).status).toBe(200);
+      const reply = await turn(id, { type: "open" });
+      const clips = [...reply.text.matchAll(/event: voice.clip\ndata: (.+)/g)];
+      expect(clips.map(match => JSON.parse(match[1]).text)).toEqual(["Describe your project.", "What did you learn?"]);
+      expect(clips[0].index).toBeLessThan(reply.text.indexOf(" did you learn?"));
+      const { seq, text, proof } = JSON.parse(clips[0][1]);
+      const { matchesVoiceProof } = await import("@/lib/streamed-voice");
+      expect(matchesVoiceProof(proof, "u1", id, seq, text)).toBe(true);
+      expect(matchesVoiceProof(proof, "u2", id, seq, text)).toBe(false);
+      expect(matchesVoiceProof(proof, "u1", id, seq, "different text")).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("uses the session owner when deleting an interview", async () => {
     const request = req("/api/v1/interviews/owned", undefined, "DELETE");
     state.user = "u2";
