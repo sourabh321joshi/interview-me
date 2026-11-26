@@ -2,6 +2,7 @@ import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { getCurrentUserId } from "@/lib/auth";
 import { consentRequired } from "@/lib/consent";
+import { voiceUsageReceipt } from "@/lib/voice-usage";
 import { deepgramToken } from "@/lib/deepgram-token";
 import { createMongoInterviewsStore } from "@/lib/interviews-store";
 import { createMongoProfilesStore } from "@/lib/profiles-store";
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
   const profile = iv.profile_id ? await createMongoProfilesStore().findOwned(user, iv.profile_id) : null;
   const keyterms = [...new Set(profile?.summary?.skills ?? [])].filter(Boolean).slice(0, 10);
   return deepgramToken({
+    usage_receipt: voiceUsageReceipt(user, iv.id),
     ws_url: "wss://api.deepgram.com/v1/listen",
     connect_params: { model: "nova-3", language: "multi", interim_results: true, endpointing: 400, keyterms },
   });

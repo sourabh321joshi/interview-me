@@ -21,9 +21,24 @@ export default function LiveCaptions({ interviewId, onWords, onRecording, showCa
     let recorder: MediaRecorder | undefined;
     let timer: number | undefined;
     const abort = new AbortController();
+    let receipt: { id: string; proof: string } | undefined;
+    let startedAt: number | undefined;
+    let sentSeconds = 0;
+    let providerSeconds: number | undefined;
     function release() {
+      if (closed) return;
       closed = true;
       abort.abort();
+      const seconds = Math.min(60, providerSeconds ?? sentSeconds);
+      if (interviewId && receipt && seconds > 0) {
+        void fetch("/api/v1/voice/stt-usage", {
+          method: "POST", headers: { "Content-Type": "application/json" }, keepalive: true,
+          body: JSON.stringify({
+            interview_id: interviewId, ...receipt, seconds,
+            source: providerSeconds === undefined ? "client_estimate" : "provider_metadata",
+          }),
+        }).catch(() => {});
+      }
       clearTimeout(timer);
       if (recorder?.state === "recording") recorder.stop();
       mic?.getTracks().forEach(track => track.stop());
@@ -71,6 +86,7 @@ export default function LiveCaptions({ interviewId, onWords, onRecording, showCa
       const data = await response.json();
       if (closed) return;
       if (!response.ok) return end(data.error?.message ?? "Could not connect.");
+      receipt = data.usage_receipt;
       const url = new URL(data.ws_url ?? "wss://api.deepgram.com/v1/listen");
       const params = data.connect_params;
       url.search = new URLSearchParams({ model: params?.model ?? "nova-3", language: params?.language ?? "multi", smart_format: "true", interim_results: "true" }).toString();
@@ -81,7 +97,10 @@ export default function LiveCaptions({ interviewId, onWords, onRecording, showCa
       const ws = new WebSocket(url, ["bearer", data.access_token]);
       socket = ws;
       recorder.ondataavailable = event => {
-        if (!closed && ws.readyState === WebSocket.OPEN && event.data.size) ws.send(event.data);
+        if (!closed && ws.readyState === WebSocket.OPEN && event.data.size) {
+          ws.send(event.data);
+          if (startedAt !== undefined) sentSeconds = (performance.now() - startedAt) / 1000;
+        }
       };
       recorder.onstop = () => {
         if (!closed && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "CloseStream" }));
@@ -89,6 +108,7 @@ export default function LiveCaptions({ interviewId, onWords, onRecording, showCa
       recorder.onerror = () => end("Microphone recording failed.");
       ws.onopen = () => {
         if (closed) return;
+        startedAt = performance.now();
         try { recorder!.start(250); } catch { return end("Browser could not start recording."); }
         setStatus("Listening · stops after one minute");
         clearTimeout(timer);
@@ -97,6 +117,9 @@ export default function LiveCaptions({ interviewId, onWords, onRecording, showCa
       ws.onmessage = event => {
         if (closed) return;
         const result = JSON.parse(event.data);
+        if (result.type === "Metadata" && typeof result.duration === "number" && Number.isFinite(result.duration) && result.duration > 0) {
+          providerSeconds = result.duration;
+        }
         if (result.type !== "Results") return;
         const words = result.channel?.alternatives?.[0]?.transcript ?? "";
         const text = [finalText, words].filter(Boolean).join(" ");

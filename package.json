@@ -13,6 +13,7 @@
     "diagnose:gemini-report": "node --env-file=.env.local --import tsx scripts/diagnose-gemini-interview-report.ts",
     "db:interview-retention": "node --env-file=.env.local --import tsx scripts/apply-interview-retention.ts",
     "db:indexes": "node --env-file=.env.local --import tsx scripts/db-indexes.ts",
+    "cost:interview": "node --env-file=.env.local --import tsx scripts/cost-interview.ts",
     "export:interview": "node --env-file=.env.local --import tsx scripts/export-interview.ts"
   },
   "dependencies": {

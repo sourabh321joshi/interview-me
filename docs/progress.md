@@ -109,3 +109,7 @@ Interview setup shows free interviews and available paid credits using the accou
 Razorpay Test Mode sells one credit for a specific interview duration. The three sandbox prices are INR 9 for 3 minutes, INR 49 for 15 minutes, and INR 89 for 30 minutes. The free allowance is one 3-minute interview per account. See razorpay-sandbox.md for setup.
 
 Razorpay sandbox checkout was verified for all three plans. The owner confirmed the INR 9 credit persisted after refresh. Disposable-account tests captured INR 49 and INR 89 through the Razorpay bank simulator, replayed each confirmation, and observed exactly one credit for the matching duration. Separate local API fixtures verified free-first spending and matched 3-, 15-, and 30-minute credit reservations without model calls.
+
+Interview usage now records speech-to-text duration per authenticated grant and estimated text-to-speech cost when a rate is configured. The local cost:interview command reports model token counts, speech seconds, and voice characters without exporting transcripts. Unpriced usage is labeled separately. Existing recordings made before speech duration logging cannot be reconstructed.
+
+Run npm run cost:interview -- <interview id> locally after configuring model prices and Deepgram rates in .env.local. The cost command reprices recorded units at the configured rates. Verify estimates against provider billing before setting live plan prices.

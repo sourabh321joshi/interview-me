@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api-error";
 import { getCurrentUserId } from "@/lib/auth";
 import { consentRequired } from "@/lib/consent";
 import { COLLECTIONS, getDb } from "@/lib/db";
+import { voiceCostUsd } from "@/lib/voice-usage";
 import { matchesVoiceProof } from "@/lib/streamed-voice";
 import { rateLimited } from "@/lib/route-guard";
 
@@ -49,6 +50,11 @@ export async function POST(request: Request) {
     await interviews.updateOne(owner, { $inc: { "usage_totals.tts_characters": -text.length } });
     return apiError("upstream_unavailable", "Question audio unavailable.");
   }
-  await db.collection(COLLECTIONS.usage_events).insertOne({ user_id: user, interview_id: owner._id, kind: "tts", role: "voice", provider: "deepgram", model, tts_characters: text.length, created_at: new Date() });
+  const cost = voiceCostUsd("tts", text.length);
+  await db.collection(COLLECTIONS.usage_events).insertOne({
+    user_id: user, interview_id: owner._id, kind: "tts", role: "voice", provider: "deepgram", model,
+    tts_characters: text.length, est_cost_usd: cost, created_at: new Date(),
+  });
+  if (cost !== null && cost > 0) await interviews.updateOne(owner, { $inc: { "usage_totals.est_cost_usd": cost } });
   return new Response(audio, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "no-store" } });
 }
