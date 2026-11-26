@@ -10,6 +10,15 @@ const Dim = z.object({
   evidence: z.array(z.object({ quote: s(400), note: s(300) })).max(4),
 });
 
+const CodeQuality = z.object({
+  score: z.number().int().min(1).max(5),
+  rationale: s(350).min(1),
+  strength: s(250).min(1),
+  improvement: s(350).min(1),
+  evidence_quote: s(300).min(1),
+  practice: s(250).min(1),
+});
+
 // Shape from interview-rubric-and-prompts-v0.1.md, section 5.
 const BaseReportSchema = z.object({
   summary: s(600),
@@ -19,16 +28,21 @@ const BaseReportSchema = z.object({
   suggested_practice: z.array(s(300)).min(1).max(5),
   limitations: s(400),
 });
-export type Report = z.infer<typeof BaseReportSchema> & { rubric_version: string };
+export type Report = z.infer<typeof BaseReportSchema> & { rubric_version: string; code_quality?: z.infer<typeof CodeQuality> };
 
 // Collapse whitespace and drop wrapping quote marks. Words must still match exactly.
 export const normalizeQuote = (q: string) => q.replace(/^["“”'‘’\s]+|["“”'‘’\s]+$/g, "").replace(/\s+/g, " ");
 
 // Every quote must appear in something the candidate said. Failures become retry feedback for the model.
-export function buildReportSchema(candidateTexts: string[]) {
+export function buildReportSchema(candidateTexts: string[], codeSource?: string) {
   const haystack = candidateTexts.map((t) => t.replace(/\s+/g, " "));
   const found = (q: string) => { const n = normalizeQuote(q); return n.length >= 8 && haystack.some((h) => h.includes(n)); };
-  return BaseReportSchema.superRefine((r, ctx) => {
+  const schema = codeSource === undefined ? BaseReportSchema : BaseReportSchema.extend({
+    code_quality: CodeQuality.refine(review => codeSource.includes(review.evidence_quote), {
+      path: ["evidence_quote"], message: "Copy the excerpt exactly from the latest submitted source",
+    }),
+  });
+  return schema.superRefine((r, ctx) => {
     for (const d of DIMENSIONS) {
       const dim = r.scores[d];
       if (dim.score !== null && dim.evidence.length === 0) {

@@ -308,6 +308,8 @@ Ready response:
 }
 ```
 
+Reports generated from an interview with a code submission also include `code_quality`. This object contains `score` (1–5), `rationale`, `strength`, `improvement`, `evidence_quote`, and `practice`. The excerpt comes from the latest submitted source.
+
 ### POST `/interviews/:id/report/regenerate`
 
 Only for `failed` reports, limited to a few attempts per interview. Response `202`.

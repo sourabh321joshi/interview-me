@@ -210,6 +210,27 @@ function ReportView({ r, details }: { r: Report; details: InterviewDetails | nul
         </ul>
       </section>
 
+      {r.code_quality && (
+        <section aria-labelledby="code-quality">
+          <h2 id="code-quality" className="text-xl font-semibold">Code quality</h2>
+          <div className="surface mt-4 space-y-4 p-5 sm:p-6">
+            <div>
+              <p className="text-sm font-semibold tabular-nums text-indigo-200">{r.code_quality.score} / 5</p>
+              <p className="mt-2 text-sm leading-relaxed text-muted">{r.code_quality.rationale}</p>
+            </div>
+            <dl className="grid gap-4 text-sm leading-relaxed sm:grid-cols-2">
+              <div><dt className="font-semibold">What worked</dt><dd className="mt-1 text-muted">{r.code_quality.strength}</dd></div>
+              <div><dt className="font-semibold">What to improve</dt><dd className="mt-1 text-muted">{r.code_quality.improvement}</dd></div>
+            </dl>
+            <pre aria-label="Excerpt from your submission" className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-background p-3 text-sm"><code>{r.code_quality.evidence_quote}</code></pre>
+            <div>
+              <h3 className="text-sm font-semibold">Practice next</h3>
+              <p className="mt-1 text-sm leading-relaxed text-muted">{r.code_quality.practice}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section aria-labelledby="strengths">
         <h2 id="strengths" className="text-xl font-semibold">What went well</h2>
         <div className="surface mt-4 px-5 py-4 sm:px-7">

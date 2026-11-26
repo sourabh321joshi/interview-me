@@ -71,8 +71,15 @@ export async function generateReport(userId: string, id: string, deps: ReportDep
   const answers = iv.turns.filter(isAnswer);
   if (answers.length < MIN_ANSWERS) return deps.reports.markFailed(userId, id, "not_enough_answers");
   try {
-    const system = loadPrompt("report", { role_and_level: `${iv.role}, ${iv.level}`, transcript: wrapData("transcript", transcriptText(iv.turns)) });
-    const out = await deps.llm.generateJson("report", buildReportSchema(answers.map((t) => t.text)), {
+    const submission = answers.findLast(turn => turn.kind === "code");
+    let system = loadPrompt("report", { role_and_level: `${iv.role}, ${iv.level}`, transcript: wrapData("transcript", transcriptText(iv.turns)) });
+    if (submission) {
+      system += "\n\n" + loadPrompt("report-coding", {
+        source: wrapData("latest_source", submission.text),
+        output: submission.output ? wrapData("candidate_output", submission.output) : "",
+      });
+    }
+    const out = await deps.llm.generateJson("report", buildReportSchema(answers.map((t) => t.text), submission?.text), {
       system, messages: [{ role: "user", content: "Evaluate the interview and return the report JSON now." }], ctx: { user_id: userId, interview_id: id },
     });
     await deps.reports.markReady(userId, id, { report: { ...out, rubric_version: RUBRIC_VERSION }, model: deps.model() });

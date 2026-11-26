@@ -34,6 +34,34 @@ async function setup(script: string[], answers = [A1, A2]) {
 }
 
 describe("generateReport", () => {
+  it("reviews the latest code and its reported test results in the existing report request", async () => {
+    const priorSource = "return numbers.length;";
+    const source = "return numbers.reduce((sum, n) => n % 2 === 0 ? sum + n : sum, 0);";
+    const output = "PASS Empty array. Input []. Expected 0. Received 0";
+    const codeQuality = {
+      score: 4, rationale: "The accumulator preserves the running sum.",
+      strength: "Initializes the accumulator to zero.", improvement: "Name the evenness check for readability.",
+      evidence_quote: "n % 2 === 0", practice: "Try an array containing only odd integers.",
+    };
+    const { id, deps, reports, calls, interviews } = await setup([J({ code_quality: codeQuality })], [A1, A2, priorSource, source]);
+    const doc = interviews.docs.get(id)!;
+    doc.duration_seconds = 600;
+    Object.assign(doc.turns[5], { kind: "code", output: "Previous attempt output" });
+    Object.assign(doc.turns[7], { kind: "code", output });
+    await endInterview("u1", id, deps);
+    await generateReport("u1", id, deps);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].system).toContain('<data label="latest_source">\n' + source);
+    expect(calls[0].system).toContain('<data label="candidate_output">\n' + output);
+    expect(calls[0].system).not.toContain("Previous attempt output");
+    expect(reports.docs.get(id)?.details?.code_quality).toEqual(codeQuality);
+    expect(buildReportSchema([A1, A2, priorSource, source], source).safeParse(report()).success).toBe(false);
+    expect(buildReportSchema([A1, A2, priorSource, source], source).safeParse(
+      report({ code_quality: { ...codeQuality, evidence_quote: priorSource } }),
+    ).success).toBe(false);
+    expect(buildReportSchema([A1, A2]).parse(report({ code_quality: codeQuality }))).not.toHaveProperty("code_quality");
+  });
+
   it("saves a ready report and copies scores, keeping null", async () => {
     const { id, deps, reports } = await setup([J()]);
     await endInterview("u1", id, deps);
