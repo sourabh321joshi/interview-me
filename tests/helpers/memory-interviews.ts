@@ -1,3 +1,4 @@
+import { interviewAllowance } from "@/lib/quota";
 import type { InterviewDoc, InterviewsStore, SlotSource, UsersStore } from "@/lib/interviews-store";
 
 export function memoryInterviews(): InterviewsStore & { docs: Map<string, InterviewDoc> } {
@@ -45,6 +46,10 @@ export function memoryUsers(paid = 0): UsersStore & { users: Map<string, { free:
   const users = new Map<string, { free: number; paid: number }>();
   return {
     users,
+    async allowance(u, limit) {
+      const account = users.get(u);
+      return interviewAllowance(limit, { free_interviews_used: account?.free, paid_interview_credits: account?.paid ?? paid });
+    },
     async ensureUser(u) { if (!users.has(u)) users.set(u, { free: 0, paid }); },
     async reserveSlot(u, limit): Promise<SlotSource | null> { // check and update in one step, like the real atomic update
       const x = users.get(u)!;

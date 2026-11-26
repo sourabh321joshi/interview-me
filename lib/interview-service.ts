@@ -1,3 +1,4 @@
+import { hasInterviewSlot } from "./quota";
 import type { ApiErrorCode } from "./api-error";
 import { CreateInterviewSchema, LlmPlanSchema, timeBudget, type CreateInterviewInput, type Plan } from "./interview-schemas";
 import { canTransition } from "./interview-state";
@@ -27,6 +28,9 @@ export async function createInterview(userId: string, raw: unknown, deps: Interv
   if (!profile) throw new DomainError("not_found", "Profile not found.");
   if (profile.status !== "ready" || !profile.summary) throw new DomainError("profile_not_ready", "Your profile is not ready yet.");
 
+  if (!hasInterviewSlot(await deps.users.allowance(userId, deps.freeLimit))) {
+    throw new DomainError("quota_exceeded", "You have no interviews left.");
+  }
   const models = deps.models(); // fails early on missing config, before anything is saved
   const now = deps.now?.() ?? new Date();
   const id = await deps.interviews.insert({

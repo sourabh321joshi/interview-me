@@ -153,7 +153,7 @@ Validates the profile (`ready`) and consent, generates the plan, and returns `20
 }
 ```
 
-The plan is stored server-side and not returned to the client. No quota is used at this point.
+The server checks that a free interview or paid credit is available before generating the plan. An exhausted account receives `402 quota_exceeded`. Starting the interview reserves the slot.
 
 ### POST `/interviews/:id/start`
 

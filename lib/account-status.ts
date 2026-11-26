@@ -1,6 +1,6 @@
 import { consentPolicy } from "./consent";
 import { COLLECTIONS, getDb } from "./db";
-import { freeInterviewLimit } from "./quota";
+import { freeInterviewLimit, interviewAllowance } from "./quota";
 
 type AccountRecord = {
   _id: string;
@@ -22,8 +22,7 @@ export async function getAccountStatus(user: { id: string; name: string }) {
   return {
     id: user.id,
     display_name: record?.display_name ?? user.name,
-    free_interviews_remaining: Math.max(0, freeInterviewLimit() - (record?.free_interviews_used ?? 0)),
-    paid_credits: record?.paid_interview_credits ?? 0,
+    ...interviewAllowance(freeInterviewLimit(), record),
     consent: { required_version: version, accepted_version: accepted ? version : null },
   };
 }

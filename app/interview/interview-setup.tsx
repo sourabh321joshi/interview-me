@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hasInterviewSlot, type InterviewAllowance } from "@/lib/quota";
 
 type Option = { value: string; label: string; detail: string };
 
@@ -29,12 +30,17 @@ function Choice({ name, option, defaultChecked }: { name: string; option: Option
   );
 }
 
-export default function InterviewSetup({ busy, error, onStart, onReview }: {
+export default function InterviewSetup({ quota, busy, error, onStart, onReview }: {
+  quota: InterviewAllowance | null | undefined;
   busy: string;
   error: string;
   onStart: (form: FormData) => Promise<void>;
   onReview: () => void;
 }) {
+  const exhausted = quota != null && !hasInterviewSlot(quota);
+  const canStart = !busy && quota !== undefined && !exhausted;
+  const free = quota?.free_interviews_remaining ?? 0;
+  const paid = quota?.paid_credits ?? 0;
   return (
     <main className="mx-auto max-w-5xl px-5 pb-12 sm:px-8">
       <header className="border-b border-line py-5">
@@ -46,7 +52,7 @@ export default function InterviewSetup({ busy, error, onStart, onReview }: {
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            if (!busy) void onStart(new FormData(event.currentTarget));
+            if (canStart) void onStart(new FormData(event.currentTarget));
           }}
           className="surface mt-7 p-5 sm:p-7"
         >
@@ -70,8 +76,15 @@ export default function InterviewSetup({ busy, error, onStart, onReview }: {
               </div>
             </fieldset>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="luna" /> Read questions aloud with Luna (sends question text to Deepgram)</label>
+            <div role="status" className="rounded-lg border border-line bg-background px-4 py-3 text-sm">
+              {quota === undefined ? "Checking interview allowance..." : quota === null ? "Interview allowance could not be loaded. It will be checked when you start." : <>
+                <p className="font-semibold">{free} free {free === 1 ? "interview" : "interviews"} remaining</p>
+                {paid > 0 && <p className="mt-1 text-muted">{paid} paid {paid === 1 ? "credit" : "credits"} available</p>}
+                {exhausted && <p className="mt-1 text-muted">You’ve used your available interviews.</p>}
+              </>}
+            </div>
             <div className="flex flex-wrap items-center gap-4 border-t border-line pt-5">
-              <button type="submit" className="action">{busy || "Start interview"}</button>
+              <button type="submit" className="action" disabled={!canStart}>{busy || "Start interview"}</button>
               <button type="button" className="text-sm font-semibold text-indigo-300 underline disabled:opacity-50" onClick={onReview}>Review profile</button>
             </div>
           </fieldset>

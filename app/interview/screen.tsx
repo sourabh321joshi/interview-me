@@ -7,6 +7,7 @@ import { playQuestionClip } from "./play-question-clip";
 import InterviewRoom, { type RoomTurn } from "./interview-room";
 import ReviewProfile from "./review-profile";
 import type { Warning } from "@/lib/profile-builder";
+import { hasInterviewSlot, type InterviewAllowance } from "@/lib/quota";
 import type { ProfileSummary } from "@/lib/schemas";
 import { useEffect, useRef, useState } from "react";
 
@@ -18,10 +19,14 @@ type TurnRequest = { client_turn_id: string } & (
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong.");
 
+class ApiRequestError extends Error {
+  constructor(message: string, public readonly code?: string) { super(message); }
+}
+
 async function api(url: string, init?: RequestInit) {
   const res = await fetch(url, init);
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.error?.message ?? `Request failed (${res.status})`);
+  if (!res.ok) throw new ApiRequestError(json?.error?.message ?? `Request failed (${res.status})`, json?.error?.code);
   return json;
 }
 
@@ -62,6 +67,7 @@ export default function InterviewPage() {
   const router = useRouter();
   const [stage, setStage] = useState<"context" | "review" | "setup" | "chat">("context");
   const [profile, setProfile] = useState<{ id: string; summary: ProfileSummary; warnings?: Warning[] } | null>(null);
+  const [quota, setQuota] = useState<InterviewAllowance | null>();
   const [manualJob, setManualJob] = useState("");
   const [interviewId, setInterviewId] = useState("");
   const [streamedVoiceSeq, setStreamedVoiceSeq] = useState<number>();
@@ -219,6 +225,7 @@ export default function InterviewPage() {
         plannedInterview.current = null;
         setProfile({ ...profile, summary: saved.summary });
       }
+      setQuota(undefined);
       setStage("setup");
     } catch (err) {
       setError(errorText(err));
@@ -227,8 +234,19 @@ export default function InterviewPage() {
     }
   }
 
+  useEffect(() => {
+    if (stage !== "setup") return;
+    const controller = new AbortController();
+    api("/api/v1/me", { signal: controller.signal }).then(account => {
+      if (!controller.signal.aborted) setQuota(account);
+    }).catch(() => {
+      if (!controller.signal.aborted) setQuota(null);
+    });
+    return () => controller.abort();
+  }, [stage]);
+
   async function startInterview(form: FormData) {
-    if (!profile || busy) return;
+    if (!profile || busy || quota === undefined || (quota && !hasInterviewSlot(quota))) return;
     setError("");
     setBusy("Preparing your interview…");
     const settings = JSON.stringify({
@@ -262,7 +280,11 @@ export default function InterviewPage() {
       setStage("chat");
       await runTurn(iv.id, { type: "open", client_turn_id: crypto.randomUUID() });
     } catch (err) {
-      setError(errorText(err));
+      if (err instanceof ApiRequestError && err.code === "quota_exceeded") {
+        setQuota({ free_interviews_remaining: 0, paid_credits: 0 });
+      } else {
+        setError(errorText(err));
+      }
       setBusy("");
     }
   }
@@ -311,7 +333,7 @@ export default function InterviewPage() {
         )}
         {profile && (
           <div hidden={stage !== "setup"}>
-            <InterviewSetup key={profile.id} busy={busy} error={error} onStart={startInterview}
+            <InterviewSetup key={profile.id} quota={quota} busy={busy} error={error} onStart={startInterview}
               onReview={() => { setError(""); setStage("review"); }} />
           </div>
         )}

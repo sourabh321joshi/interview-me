@@ -27,6 +27,23 @@ async function setup(opts: { freeLimit?: number; paid?: number; llmScript?: Arra
 }
 
 describe("createInterview", () => {
+  it("rejects exhausted accounts before saving an interview or spending a model request", async () => {
+    const { deps, pid, interviews, calls } = await setup();
+    const first = await createInterview("u1", input(pid), deps);
+    await startInterview("u1", first.id, deps);
+    await expect(createInterview("u1", input(pid), deps)).rejects.toMatchObject({ code: "quota_exceeded" });
+    expect(calls).toHaveLength(1);
+    expect(interviews.docs.size).toBe(1);
+  });
+
+  it("treats a zero free limit as exhausted for a new account without paid credits", async () => {
+    const { deps, pid, interviews, users, calls } = await setup({ freeLimit: 0 });
+    await expect(createInterview("u1", input(pid), deps)).rejects.toMatchObject({ code: "quota_exceeded" });
+    expect(calls).toHaveLength(0);
+    expect(interviews.docs.size).toBe(0);
+    expect(users.users.size).toBe(0);
+  });
+
   it("stores a plan with server-computed pacing and an expiry", async () => {
     const { deps, pid, calls } = await setup();
     const iv = await createInterview("u1", input(pid), deps);

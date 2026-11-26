@@ -1,5 +1,6 @@
 import { ObjectId, type Document, type UpdateFilter } from "mongodb";
 import { COLLECTIONS, getDb } from "./db";
+import { interviewAllowance, type InterviewAllowance } from "./quota";
 import { interviewExpiry } from "./retention";
 import type { Plan } from "./interview-schemas";
 
@@ -30,6 +31,7 @@ export interface InterviewsStore {
   start(userId: string, id: string, data: { started_at: Date; ends_at: Date; slot_source: SlotSource }): Promise<InterviewDoc | null>; // plan_ready -> in_progress
 }
 export interface UsersStore {
+  allowance(userId: string, freeLimit: number): Promise<InterviewAllowance>;
   ensureUser(userId: string): Promise<void>;
   reserveSlot(userId: string, freeLimit: number): Promise<SlotSource | null>;
   refundSlot(userId: string, source: SlotSource): Promise<void>;
@@ -101,6 +103,12 @@ export function createMongoInterviewsStore(): InterviewsStore {
 export function createMongoUsersStore(): UsersStore {
   const col = async () => (await getDb()).collection<{ _id: string } & Document>(COLLECTIONS.app_users);
   return {
+    async allowance(userId, freeLimit) {
+      const record = await (await col()).findOne<{ free_interviews_used?: number; paid_interview_credits?: number }>(
+        { _id: userId }, { projection: { free_interviews_used: 1, paid_interview_credits: 1 } },
+      );
+      return interviewAllowance(freeLimit, record);
+    },
     async ensureUser(userId) {
       try {
         await (await col()).updateOne(
@@ -115,7 +123,10 @@ export function createMongoUsersStore(): UsersStore {
     // Each step is a single atomic update, so two requests can never take the same last slot.
     async reserveSlot(userId, freeLimit) {
       const c = await col();
-      if (await c.findOneAndUpdate({ _id: userId, free_interviews_used: { $lt: freeLimit } }, { $inc: { free_interviews_used: 1 } })) return "free";
+      if (freeLimit > 0 && await c.findOneAndUpdate(
+        { _id: userId, $or: [{ free_interviews_used: { $lt: freeLimit } }, { free_interviews_used: { $exists: false } }] },
+        { $inc: { free_interviews_used: 1 } },
+      )) return "free";
       if (await c.findOneAndUpdate({ _id: userId, paid_interview_credits: { $gt: 0 } }, { $inc: { paid_interview_credits: -1 } })) return "paid";
       return null;
     },

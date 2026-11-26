@@ -103,3 +103,5 @@ Standard interviews use a shared JavaScript challenge, Sum the even numbers. The
 Reports now include code-quality feedback when the candidate submitted source. The existing report request reviews the latest submission and its candidate-reported test output, validates the cited code excerpt, and suggests an edge case to practice.
 
 History now charts the four rubric dimensions for reports on the current page, oldest to newest. It shows change from the previous scored attempt and links each selected interview to its report. The chart uses the existing signed-in history query.
+
+Interview setup shows free interviews and available paid credits using the account status API. A quota preflight rejects exhausted accounts before creating an interview or calling the planner. Interview start still reserves a slot atomically.
