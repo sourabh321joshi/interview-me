@@ -97,3 +97,5 @@ The 10-minute Standard interview offers a lazy-loaded Monaco JavaScript editor. 
 Standard interview candidates can run their JavaScript in a worker inside a sandboxed frame. A run stops after two seconds and its output accompanies submission only when it matches the current source.
 
 An isolated local Chrome test verified console output, async return values, runtime errors, loop timeout, and blocked network access. A simulated interview verified output persistence and retry.
+
+Standard interviews use a shared JavaScript challenge, Sum the even numbers. The editor runs three visible cases in isolated workers and shows expected and actual results. Submission includes results from the current source as candidate-reported output.

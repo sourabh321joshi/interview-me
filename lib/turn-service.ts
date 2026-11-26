@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { codingChallenge } from "./coding-challenge";
 import { SMOKE_TEST_DURATION, timeBudget } from "./interview-schemas";
 import { DomainError } from "./interview-service";
 import type { InterviewDoc, InterviewsStore, Turn } from "./interviews-store";
@@ -194,7 +195,7 @@ export async function prepareTurn(userId: string, id: string, raw: unknown, deps
 
   const tag = (ms: number) => `[elapsed: ${fmt(ms)} of ${fmt(iv.duration_seconds * 1000)}]`;
   const interviewSystem = iv.duration_seconds === 600
-    ? system + "\n\n" + loadPrompt("interviewer-coding")
+    ? system + "\n\n" + loadPrompt("interviewer-coding", { challenge: codingChallenge.task, examples: JSON.stringify(codingChallenge.cases) })
     : system;
   const messages: Message[] = [{ role: "user", content: `${tag(0)} (The interview is starting. Greet the candidate and ask your first question.)` }];
   for (const t of turns) {

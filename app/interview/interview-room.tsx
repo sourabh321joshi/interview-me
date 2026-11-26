@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { runJavaScript } from "./run-javascript";
+import { codingChallenge, summarizeCodingCases, type CodingCaseResult } from "@/lib/coding-challenge";
+import { runCodingCase, runJavaScript } from "./run-javascript";
 import CodeEditor from "./code-editor";
 import LunaQuestion from "./luna-question";
 import LiveCaptions from "../voice-test/live-captions";
@@ -41,27 +42,43 @@ export default function InterviewRoom({
   error, draft, onDraft, onSend, onSendCode, onRetry, onEnd,
 }: Props) {
   const [editingCode, setEditingCode] = useState(false);
-  const [code, setCode] = useState("");
-  const [runningCode, setRunningCode] = useState(false);
+  const [code, setCode] = useState<string>(codingChallenge.starter);
+  const [runningCode, setRunningCode] = useState<"code" | "tests" | null>(null);
+  const [caseResult, setCaseResult] = useState<{ source: string; cases: CodingCaseResult[] }>();
   const [codeResult, setCodeResult] = useState<{ source: string; output: string }>();
   const codeRun = useRef<AbortController | null>(null);
   useEffect(() => () => codeRun.current?.abort(), []);
   const output = codeResult?.source === code ? codeResult.output : undefined;
 
-  async function runCode() {
+  const results = caseResult?.source === code ? caseResult.cases : undefined;
+  const testSummary = results ? summarizeCodingCases(results) : undefined;
+  const submissionOutput = [testSummary, output].filter(Boolean).join("\n\n").slice(0, 2000) || undefined;
+  const canRun = code !== codingChallenge.starter && !!code.trim() && code.length <= 2000;
+
+  async function runCode(mode: "code" | "tests") {
     if (codeRun.current) return;
     const controller = new AbortController();
     codeRun.current = controller;
-    setRunningCode(true);
-    setCodeResult(undefined);
+    setRunningCode(mode);
+    if (mode === "tests") setCaseResult(undefined);
+    else setCodeResult(undefined);
     try {
-      const result = await runJavaScript(code, controller.signal);
-      setCodeResult({ source: code, output: result });
+      if (mode === "tests") {
+        const cases = await Promise.all(codingChallenge.cases.map(test => runCodingCase(code, test, controller.signal)));
+        setCaseResult({ source: code, cases });
+      } else {
+        const result = await runJavaScript(code, controller.signal);
+        setCodeResult({ source: code, output: result });
+      }
     } catch {
-      if (!controller.signal.aborted) setCodeResult({ source: code, output: "The JavaScript runner could not start." });
+      if (!controller.signal.aborted) {
+        const failure = { output: "The JavaScript runner could not start." };
+        if (mode === "tests") setCaseResult({ source: code, cases: codingChallenge.cases.map(() => failure) });
+        else setCodeResult({ source: code, ...failure });
+      }
     } finally {
       codeRun.current = null;
-      if (!controller.signal.aborted) setRunningCode(false);
+      if (!controller.signal.aborted) setRunningCode(null);
     }
   }
   const [recording, setRecording] = useState(false);
@@ -220,13 +237,17 @@ export default function InterviewRoom({
           <form onSubmit={(event) => {
             event.preventDefault();
             if (!canSubmit) return;
-            if (editingCode && !runningCode) void onSendCode?.(code, output);
+            if (editingCode && !runningCode && canRun) void onSendCode?.(code, submissionOutput);
             else if (!editingCode) void onSend();
           }} className="max-h-[60dvh] shrink-0 space-y-2 overflow-y-auto border-t border-line px-4 py-3 sm:px-6">
             {onSendCode && <button type="button" aria-pressed={editingCode} disabled={recording}
               className="text-sm font-semibold text-indigo-300 underline disabled:opacity-50"
               onClick={() => setEditingCode(!editingCode)}>JavaScript editor</button>}
             {editingCode ? <>
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold">{codingChallenge.title}</h3>
+                <p className="text-sm text-muted">{codingChallenge.task}</p>
+              </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold">JavaScript</span>
                 <span className={code.length > 2000 ? "text-xs text-red-300" : "text-xs text-muted"}>{code.length} / 2000</span>
@@ -234,11 +255,33 @@ export default function InterviewRoom({
               <CodeEditor value={code} onChange={setCode} disabled={!canAnswer} />
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50"
-                  disabled={!canAnswer || runningCode || !code.trim() || code.length > 2000} onClick={() => void runCode()}>
-                  {runningCode ? "Running..." : "Run code"}
+                  disabled={!canAnswer || !!runningCode || !canRun} onClick={() => void runCode("code")}>
+                  {runningCode === "code" ? "Running..." : "Run code"}
                 </button>
-                <button className="action" disabled={!canSubmit || runningCode || !code.trim() || code.length > 2000}>Submit code</button>
+                <button type="button" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                  disabled={!canAnswer || !!runningCode || !canRun} onClick={() => void runCode("tests")}>
+                  {runningCode === "tests" ? "Testing..." : "Run tests"}
+                </button>
+                <button className="action" disabled={!canSubmit || !!runningCode || !canRun}>Submit code</button>
               </div>
+              <section className="rounded-lg border border-line bg-background p-3" aria-label="Test cases">
+                <h3 className="text-sm font-semibold">Test cases</h3>
+                <ul className="mt-2 space-y-2 text-sm" aria-live="polite">
+                  {codingChallenge.cases.map((test, index) => {
+                    const result = results?.[index];
+                    return <li key={test.name} className="break-words">
+                      <span className="font-medium">{test.name}</span>
+                      {result && <span className={result.actual === test.expected ? "ml-2 text-emerald-300" : "ml-2 text-red-300"}>
+                        {result.actual === test.expected ? "Pass" : "Fail"}
+                      </span>}
+                      <div className="font-mono text-xs text-muted">
+                        {JSON.stringify(test.input)} → {test.expected}
+                        {result && <> · Received {result.output}</>}
+                      </div>
+                    </li>;
+                  })}
+                </ul>
+              </section>
               {output !== undefined && <section aria-label="Code output" className="rounded-lg border border-line bg-background p-3">
                 <h3 className="text-sm font-semibold">Output</h3>
                 <pre role="status" className="mt-1 max-h-36 overflow-auto whitespace-pre-wrap break-words text-sm">{output}</pre>

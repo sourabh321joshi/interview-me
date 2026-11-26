@@ -1,3 +1,4 @@
+import { codingChallenge, summarizeCodingCases } from "@/lib/coding-challenge";
 import { describe, expect, it } from "vitest";
 import { collect, getInterviewView, MarkerStripper, prepareTurn, type TurnEvent } from "@/lib/turn-service";
 import { startedInterview } from "./helpers/turn-setup";
@@ -23,7 +24,13 @@ describe("turns", () => {
     const { id, deps, interviews, calls } = await startedInterview([["Write a sum function."], [new Error("interrupted")], ["Why use reduce?"]], 600);
     await collect(await prepareTurn("u1", id, { client_turn_id: uid(), type: "open" }, deps));
     const code = "function sum(values) {\n  return values.reduce((a, b) => a + b, 0);\n}\n";
-    const output = "42\n";
+    expect(calls[0].system).toContain(codingChallenge.task);
+    expect(calls[0].system).toContain(JSON.stringify(codingChallenge.cases));
+    const output = summarizeCodingCases([
+      { output: "6", actual: 6 }, { output: "0", actual: 0 }, { output: "0", actual: 0 },
+    ]);
+    expect(output).toContain("PASS Mixed numbers");
+    expect(output).toContain("FAIL Negative numbers and zero. Input [-4,-3,0,2]. Expected -2. Received 0");
     const request = { client_turn_id: uid(), type: "code", code, output };
     await expect(collect(await prepareTurn("u1", id, request, deps))).rejects.toThrow("interrupted");
     expect(interviews.docs.get(id)!.turns[1]).toMatchObject({ kind: "code", text: code, output });
