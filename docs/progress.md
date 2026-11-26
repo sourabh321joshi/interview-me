@@ -107,3 +107,5 @@ History now charts the four rubric dimensions for reports on the current page, o
 Interview setup shows free interviews and available paid credits using the account status API. A quota preflight rejects exhausted accounts before creating an interview or calling the planner. Interview start still reserves a slot atomically.
 
 Razorpay Test Mode sells one credit for a specific interview duration. The three sandbox prices are INR 9 for 3 minutes, INR 49 for 15 minutes, and INR 89 for 30 minutes. The free allowance is one 3-minute interview per account. See razorpay-sandbox.md for setup.
+
+Razorpay sandbox checkout was verified for all three plans. The owner confirmed the INR 9 credit persisted after refresh. Disposable-account tests captured INR 49 and INR 89 through the Razorpay bank simulator, replayed each confirmation, and observed exactly one credit for the matching duration. Separate local API fixtures verified free-first spending and matched 3-, 15-, and 30-minute credit reservations without model calls.
