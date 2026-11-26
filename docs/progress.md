@@ -113,3 +113,16 @@ Razorpay sandbox checkout was verified for all three plans. The owner confirmed 
 Interview usage now records speech-to-text duration per authenticated grant and estimated text-to-speech cost when a rate is configured. The local cost:interview command reports model token counts, speech seconds, and voice characters without exporting transcripts. Unpriced usage is labeled separately. Existing recordings made before speech duration logging cannot be reconstructed.
 
 Run npm run cost:interview -- <interview id> locally after configuring model prices and Deepgram rates in .env.local. The cost command reprices recorded units at the configured rates. Verify estimates against provider billing before setting live plan prices.
+
+### 30-minute voice plan cost benchmark
+
+A disposable account ran one live OpenAI and Deepgram benchmark with a fictional candidate on 2026-11-26. The interview used a 30-minute credit and a simulated timer schedule. The interviewer ended the session at 19:40 of simulated interview time after nine candidate answers. The feedback report was ready on its first attempt. The account, transcript, and report were deleted after the run. The remaining usage counts are anonymous.
+
+| Workload | Recorded usage | Estimated USD |
+| --- | --- | ---: |
+| Planning, replies, and feedback | 12 requests, 21,969 input tokens including 4,480 cached, 2,068 output tokens | $0.02363 |
+| Deepgram Nova-3 transcription | 5 recordings, 218.19 seconds with keyterm prompting | $0.02582 |
+| Deepgram Luna playback | 27 generated clips, 1,700 characters | $0.05100 |
+| Total | | $0.10044 |
+
+Published rates for [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [GPT-4.1](https://developers.openai.com/api/docs/models/gpt-4.1), and [Deepgram](https://deepgram.com/pricing) put this run at approximately INR 9.29 using INR 92.5 per USD. At INR 89 and [Razorpay's standard domestic fee](https://razorpay.com/blog/razorpay-payment-gateway-pricing-explained), including GST on that fee, about INR 77.61 remained for this run before hosting, support, refunds, and applicable sales taxes. The session ended before the timer expired. Usage during a session that reaches the full duration and the billed amounts still need verification.
